@@ -10,6 +10,7 @@ Automatically generated from active Markdown memories.
 
 - [会员分类与单效指标](03_Memory/BI/指标计算/会员分类与单效指标.md)
 - [商品成本计算](03_Memory/BI/指标计算/商品成本计算.md)
+- [报表同环比时间维度与粒度规则](03_Memory/BI/指标计算/报表同环比时间维度与粒度规则.md)
 - [费用分摊与净利润指标](03_Memory/BI/指标计算/费用分摊与净利润.md)
 
 ## Projects
@@ -18,6 +19,7 @@ Automatically generated from active Markdown memories.
 
 ## SQL
 
+- [ClickHouse 查询技能与只读查询规范](03_Memory/SQL/clickhouse-查询技能与只读查询规范-72cc7a2e.md)
 - [会员销售归类异常：品牌 15056](03_Memory/SQL/SQL问题排查/会员销售归类异常-品牌15056.md)
 - [期初库存与 biz_type](03_Memory/SQL/字段血缘/期初库存与biz_type.md)
 
