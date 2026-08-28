@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dianjia Memory</title>
+  <style>
+    :root { color-scheme: light; --ink:#17212b; --muted:#6b7785; --line:#d8dee6; --panel:#fff; --bg:#f4f6f8; --accent:#1769aa; --accent-dark:#0f4f82; --ok:#237a57; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--bg); font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+    header { background:#17212b; color:#fff; padding:20px 28px; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { margin:0; font-size:20px; font-weight:600; letter-spacing:0; } header .meta { color:#b7c1cc; font-size:12px; }
+    main { max-width:1180px; margin:24px auto; padding:0 20px; display:grid; gap:16px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:18px; }
+    h2 { margin:0 0 14px; font-size:16px; font-weight:600; } h3 { margin:16px 0 6px; font-size:14px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .stats { display:flex; gap:28px; color:var(--muted); } .stats strong { display:block; color:var(--ink); font-size:22px; font-weight:600; }
+    textarea, input { width:100%; border:1px solid var(--line); border-radius:4px; padding:10px; color:var(--ink); background:#fff; font:inherit; } textarea { min-height:140px; resize:vertical; }
+    .row { display:flex; gap:8px; align-items:center; } .row > * { flex:1; } .row button { flex:0 0 auto; }
+    button { border:1px solid var(--accent); border-radius:4px; color:#fff; background:var(--accent); padding:8px 13px; font:inherit; cursor:pointer; } button:hover { background:var(--accent-dark); } button.secondary { color:var(--accent); background:#fff; }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; } .actions button { min-width:120px; }
+    #status, #result { white-space:pre-wrap; word-break:break-word; color:var(--muted); } #result { color:var(--ink); max-height:480px; overflow:auto; }
+    .memory { border-top:1px solid var(--line); padding:12px 0; } .memory:first-child { border-top:0; } .memory-title { font-weight:600; } .memory-path { color:var(--muted); font-size:12px; }
+    .notice { color:var(--ok); min-height:22px; margin-top:8px; } @media (max-width:760px) { .grid { grid-template-columns:1fr; } header { padding:16px 18px; } main { margin:14px auto; padding:0 12px; } }
+  </style>
+</head>
+<body>
+  <header><h1>Dianjia Memory</h1><div class="meta">本地知识库控制台</div></header>
+  <main>
+    <section><h2>系统状态</h2><div class="stats"><div><strong id="sources">-</strong>原始记录</div><div><strong id="memories">-</strong>长期记忆</div><div><strong id="actions">-</strong>处理记录</div></div><div class="actions"><button class="secondary" onclick="run('/api/rebuild-index','索引已重建')">重建索引</button><button class="secondary" onclick="refreshStatus()">刷新状态</button></div><div id="status" class="notice"></div></section>
+    <div class="grid">
+      <section><h2>导入对话</h2><textarea id="input" placeholder="粘贴今天的聊天记录或工作记录"></textarea><div class="row" style="margin-top:8px"><input id="inputName" value="web-conversation" aria-label="记录名称"><input id="inputDate" type="date" aria-label="记录日期"><button onclick="ingest()">导入</button></div><div id="ingestNotice" class="notice"></div></section>
+      <section><h2>每日处理</h2><div class="row"><input id="runDate" type="date" aria-label="处理日期"><button onclick="daily()">生成日报</button><button onclick="run('/api/run-daily','每日流程已完成')">一键处理</button></div><div class="actions"><button class="secondary" onclick="run('/api/extract','候选记忆已提取')">提取候选</button><button class="secondary" onclick="run('/api/process','候选记忆已处理')">处理记忆</button></div><div id="pipelineNotice" class="notice"></div></section>
+    </div>
+    <section><h2>知识库问答</h2><div class="row"><input id="question" placeholder="输入问题，例如：我之前如何处理库存唯一键？"><button onclick="ask()">检索并回答</button></div><div id="answer" style="margin-top:14px"></div></section>
+    <section><h2>记忆搜索</h2><div class="row"><input id="query" placeholder="按标题、标签、分类或摘要搜索"><button onclick="search()">搜索</button></div><div id="results" style="margin-top:12px"></div></section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    async function api(url, options={}) { const r = await fetch(url, {headers:{'Content-Type':'application/json'}, ...options}); const data = await r.json(); if (!r.ok) throw new Error(data.error || '请求失败'); return data; }
+    async function refreshStatus(){ try { const d=await api('/api/status'); ['sources','memories','actions'].forEach(k=>$(k).textContent=d[k]); } catch(e){ $('status').textContent=e.message; } }
+    async function ingest(){ try { const d=await api('/api/ingest',{method:'POST',body:JSON.stringify({content:$('input').value,name:$('inputName').value,date:$('inputDate').value||null})}); $('ingestNotice').textContent='已导入：'+d.path; $('input').value=''; refreshStatus(); } catch(e){ $('ingestNotice').textContent=e.message; } }
+    async function run(url, message){ try { const d=await api(url,{method:'POST',body:JSON.stringify({date:$('runDate').value||null})}); $('pipelineNotice').textContent=message+(d.outcomes?.length?'\n'+d.outcomes.join('\n'):''); refreshStatus(); } catch(e){ $('pipelineNotice').textContent=e.message; } }
+    async function daily(){ try { const d=await api('/api/daily',{method:'POST',body:JSON.stringify({date:$('runDate').value||null})}); $('pipelineNotice').textContent='日报已生成：'+d.path; } catch(e){ $('pipelineNotice').textContent=e.message; } }
+    async function ask(){ try { const d=await api('/api/ask',{method:'POST',body:JSON.stringify({question:$('question').value,limit:5})}); $('answer').innerHTML='<div>'+escapeHtml(d.answer).replaceAll('\n','<br>')+'</div>'+(d.memories.length?'<h3>参考记忆</h3>'+d.memories.map(m=>'<div class="memory"><div class="memory-title">'+escapeHtml(m.title)+'</div><div class="memory-path">'+escapeHtml(m.path)+'</div></div>').join(''):''); } catch(e){ $('answer').textContent=e.message; } }
+    async function search(){ try { const d=await api('/api/search?q='+encodeURIComponent($('query').value)); $('results').innerHTML=d.length?d.map(m=>'<div class="memory"><div class="memory-title">'+escapeHtml(m.title)+'</div><div class="memory-path">'+escapeHtml(m.category)+' · '+escapeHtml(m.path)+'</div></div>').join(''):'未找到相关记忆'; } catch(e){ $('results').textContent=e.message; } }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    refreshStatus();
+  </script>
+</body>
+</html>

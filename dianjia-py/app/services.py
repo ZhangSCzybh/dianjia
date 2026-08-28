@@ -1,0 +1,333 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import re
+import uuid
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
+
+from .config import Settings
+from .database import connect
+from .markdown import dump_frontmatter, parse_frontmatter, slugify
+from .ai.client import AIClient
+
+
+class MemoryService:
+    def __init__(self, settings: Settings):
+        self.s = settings
+        self.s.knowledge_root.mkdir(parents=True, exist_ok=True)
+        self.conn = connect(self.s.db_path)
+
+    def init(self) -> None:
+        for directory in ("00_Inbox", "01_Daily", "02_Candidate", "03_Memory", "04_Weekly", "05_Monthly", "06_Archive"):
+            (self.s.knowledge_root / directory).mkdir(parents=True, exist_ok=True)
+        index = self.s.knowledge_root / "INDEX.md"
+        if not index.exists():
+            index.write_text("# Dianjia Knowledge Index\n\n## Memory\n\n", encoding="utf-8")
+
+    def ingest(self, source: Path, source_date: str | None = None) -> Path:
+        self.init()
+        content = source.read_text(encoding="utf-8")
+        return self.ingest_text(content, source.stem, source_date, "file")
+
+    def ingest_text(self, content: str, name: str = "conversation", source_date: str | None = None, source_type: str = "text") -> Path:
+        """Import text directly, allowing clipboard/stdin integrations."""
+        self.init()
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        existing = self.conn.execute("SELECT path FROM sources WHERE content_hash = ?", (digest,)).fetchone()
+        if existing:
+            return self.s.knowledge_root / existing["path"]
+        day = source_date or date.today().isoformat()
+        target = self.s.knowledge_root / "00_Inbox" / f"{day}--{slugify(name)}.md"
+        if target.exists():
+            target = target.with_name(f"{day}--{slugify(name)}-{digest[:8]}.md")
+        target.write_text(content, encoding="utf-8")
+        rel = target.relative_to(self.s.knowledge_root).as_posix()
+        self.conn.execute("INSERT INTO sources VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), source_type, digest, rel, day, datetime.now().isoformat(timespec="seconds")))
+        self.conn.commit()
+        return target
+
+    def ingest_directory(self, directory: Path, source_date: str | None = None) -> list[Path]:
+        """Import all Markdown/TXT files, using YYYY-MM-DD found in each filename."""
+        paths = []
+        for source in sorted(directory.rglob("*")):
+            if source.is_file() and source.suffix.lower() in {".md", ".markdown", ".txt"}:
+                match = re.search(r"(20\d{2}-\d{2}-\d{2})", source.name)
+                paths.append(self.ingest(source, source_date or (match.group(1) if match else None)))
+        return paths
+
+    def run_daily(self, day: str | None = None) -> list[str]:
+        """Run the complete offline daily pipeline in one command."""
+        self.daily(day)
+        candidate = self.extract(day)
+        return self.process(candidate)
+
+    def daily(self, day: str | None = None) -> Path:
+        self.init()
+        day = day or date.today().isoformat()
+        rows = self.conn.execute("SELECT path FROM sources WHERE source_date = ? ORDER BY path", (day,)).fetchall()
+        entries = []
+        for row in rows:
+            path = self.s.knowledge_root / row["path"]
+            if path.exists():
+                entries.append(path.read_text(encoding="utf-8").strip())
+        completed = [x for x in entries if x]
+        body = [f"# {day} 每日工作总结", "", "## 今日完成事项", ""]
+        body.extend(f"{i}. {re.sub(r'^#\s*', '', item.splitlines()[0])[:200]}" for i, item in enumerate(completed, 1))
+        if not completed:
+            body.append("- 暂无导入内容")
+        body += ["", "## 原始记录", ""]
+        body.extend(f"### 记录 {i}\n\n{item}" for i, item in enumerate(completed, 1))
+        body += ["", "## 明天继续关注事项", "", "- 根据今日记录补充后续行动"]
+        target = self.s.knowledge_root / "01_Daily" / day[:4] / day[5:7] / f"{day}.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(dump_frontmatter({"date": day, "type": "daily"}, "\n".join(body)), encoding="utf-8")
+        return target
+
+    def extract(self, day: str | None = None) -> Path:
+        day = day or date.today().isoformat()
+        daily_path = self.s.knowledge_root / "01_Daily" / day[:4] / day[5:7] / f"{day}.md"
+        if not daily_path.exists():
+            self.daily(day)
+        _, body = parse_frontmatter(daily_path.read_text(encoding="utf-8"))
+        candidates: list[dict[str, Any]] = []
+        for heading, content in re.findall(r"^###\s+(.+?)\n([\s\S]*?)(?=^###\s+|\Z)", body, re.M):
+            content = content.strip()
+            if not content:
+                continue
+            title = heading.strip()
+            if title.startswith("记录 "):
+                first = next((line.strip().lstrip("# ") for line in content.splitlines() if line.strip()), title)
+                title = first[:100]
+            candidates.append({"title": title, "category": "General", "subcategory": None, "tags": [], "summary": content[:240], "content": content, "source_date": day, "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}})
+        target = self.s.knowledge_root / "02_Candidate" / f"{day}-candidates.json"
+        target.write_text(json.dumps(candidates, ensure_ascii=False, indent=2), encoding="utf-8")
+        return target
+
+    def search(self, keyword: str, limit: int = 10):
+        like = f"%{keyword}%"
+        return self.conn.execute("SELECT * FROM memories WHERE status = 'active' AND (title LIKE ? OR tags LIKE ? OR category LIKE ? OR summary LIKE ?) ORDER BY updated_at DESC LIMIT ?", (like, like, like, like, limit)).fetchall()
+
+    def retrieve_context(self, query: str, limit: int = 5, max_chars: int = 12000) -> list[dict[str, Any]]:
+        """Retrieve at most five ranked memory excerpts for a RAG prompt.
+
+        The local hashed-vector embedding keeps the MVP dependency-free. A cosine
+        score ranks semantic/phrase overlap, while metadata matches provide a small
+        boost for exact titles, tags, and categories.
+        """
+        limit = max(1, min(int(limit), 5))
+        terms = self._query_terms(query)
+        query_vector = self._embedding(query)
+        rows = self.conn.execute("SELECT * FROM memories WHERE status = 'active'").fetchall()
+        ranked: list[tuple[float, dict[str, Any]]] = []
+        for row in rows:
+            path = self.s.knowledge_root / row["path"]
+            if not path.exists():
+                continue
+            text = path.read_text(encoding="utf-8")
+            meta, body = parse_frontmatter(text)
+            fields = {
+                "title": str(row["title"] or ""),
+                "category": str(row["category"] or ""),
+                "tags": str(row["tags"] or ""),
+                "summary": str(row["summary"] or ""),
+            }
+            searchable = " ".join([fields["title"], fields["category"], fields["tags"], fields["summary"], body])
+            ascii_terms = [term for term in terms if re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", term)]
+            searchable_lower = searchable.lower()
+            # Hash vectors can collide. Keep exact identifier terms (DRP, SQL,
+            # model names, table names) as a hard filter to prevent false hits.
+            if ascii_terms and not all(term in searchable_lower for term in ascii_terms):
+                continue
+            if not self._matches_topic(query, searchable_lower):
+                continue
+            embedding_score = self._cosine(query_vector, self._embedding(searchable))
+            lexical_score = 0.0
+            for term in terms:
+                if term in fields["title"]:
+                    lexical_score += 10
+                if term in fields["tags"]:
+                    lexical_score += 5
+                if term in fields["category"] or term in fields["summary"]:
+                    lexical_score += 3
+                lexical_score += min(4, body.lower().count(term.lower()))
+            score = embedding_score * 100 + lexical_score
+            # Require either a meaningful vector match or a strong metadata match;
+            # incidental one-word body hits should not enter the RAG context.
+            if embedding_score >= 0.08 or lexical_score >= 5:
+                ranked.append((score, {"id": row["id"], "title": row["title"], "category": row["category"], "path": row["path"], "score": round(score, 2), "embedding_score": round(embedding_score, 4), "content": body.strip(), "metadata": meta}))
+        ranked.sort(key=lambda item: (-item[0], item[1]["title"]))
+        results, used = [], 0
+        for _, item in ranked[:limit]:
+            remaining = max_chars - used
+            if remaining <= 0:
+                break
+            item["content"] = item["content"][:remaining]
+            used += len(item["content"])
+            results.append(item)
+        return results
+
+    @staticmethod
+    def _embedding(text: str, dimensions: int = 384) -> list[float]:
+        """Create a deterministic hashed n-gram vector for local embedding search."""
+        vector = [0.0] * dimensions
+        lowered = text.lower()
+        features = re.findall(r"[a-z0-9][a-z0-9_.-]*|[\u4e00-\u9fff]", lowered)
+        features.extend(lowered[i:i + 2] for i in range(len(lowered) - 1) if "\u4e00" <= lowered[i] <= "\u9fff" and "\u4e00" <= lowered[i + 1] <= "\u9fff")
+        for feature in features:
+            index = int(hashlib.sha256(feature.encode("utf-8")).hexdigest()[:8], 16) % dimensions
+            vector[index] += 1.0
+        norm = math.sqrt(sum(value * value for value in vector))
+        return [value / norm for value in vector] if norm else vector
+
+    @staticmethod
+    def _cosine(left: list[float], right: list[float]) -> float:
+        return sum(a * b for a, b in zip(left, right))
+
+    @staticmethod
+    def _matches_topic(query: str, searchable: str) -> bool:
+        """Apply query-derived topic anchors before approximate ranking.
+
+        Anchors are inferred from the query itself, so new business topics do not
+        require a code change. CJK bigrams handle unspaced Chinese terms; ASCII
+        identifiers remain exact filters.
+        """
+        query_lower = query.lower()
+        searchable = searchable.lower()
+        ascii_terms = [term for term in re.findall(r"[a-z0-9][a-z0-9_.-]*", query_lower) if len(term) > 1]
+        if ascii_terms and not all(term in searchable for term in ascii_terms):
+            return False
+        stop_chars = set("我有吗呢的问题相关之前如何怎么处理一下请问和与或这是那什么哪些告诉总结过")
+        cjk_sequences = re.findall(r"[\u4e00-\u9fff]+", query_lower)
+        anchors: list[str] = []
+        for sequence in cjk_sequences:
+            if len(sequence) == 1:
+                continue
+            anchors.extend(sequence[i:i + 2] for i in range(len(sequence) - 1))
+        anchors = [anchor for anchor in dict.fromkeys(anchors) if not any(char in stop_chars for char in anchor)]
+        # At least one distinctive Chinese phrase must be present. This removes
+        # unrelated documents while still allowing synonym-rich related notes.
+        return not anchors or any(anchor in searchable for anchor in anchors)
+
+    @staticmethod
+    def _query_terms(query: str) -> list[str]:
+        normalized = re.sub(r"\s+", " ", query.strip().lower())
+        stopwords = {"我", "之前", "有", "吗", "呢", "的", "了", "是", "如何", "怎么", "处理", "相关", "问题", "有没有", "哪些", "一下", "请问", "和", "与", "或", "吗"}
+        terms = [part for part in re.findall(r"[a-z0-9][a-z0-9_.-]*|[\u4e00-\u9fff]+", normalized) if part not in stopwords and len(part) > 1]
+        # Chinese questions often have no spaces; use meaningful character bigrams,
+        # excluding generic question words that otherwise match every note.
+        generic_chars = set("我有吗呢的问题相关之前如何怎么处理一下请问和与或")
+        for sequence in re.findall(r"[\u4e00-\u9fff]+", normalized):
+            if len(sequence) > 2:
+                terms.extend(pair for pair in (sequence[i:i + 2] for i in range(len(sequence) - 1)) if pair not in stopwords and not any(char in generic_chars for char in pair))
+        return list(dict.fromkeys(terms)) or [normalized]
+
+    def build_context(self, query: str, limit: int = 5, max_chars: int = 12000) -> tuple[str, list[dict[str, Any]]]:
+        memories = self.retrieve_context(query, min(limit, 5), max_chars)
+        if not memories:
+            return "（知识库中没有检索到相关记忆）", []
+        sections = []
+        for i, memory in enumerate(memories, 1):
+            sections.append(f"【历史记忆 {i}】\n标题：{memory['title']}\n分类：{memory['category']}\n相关性：{memory['score']}\n来源：{memory['path']}\n\n{memory['content']}")
+        return "\n\n---\n\n".join(sections), memories
+
+    def ask(self, query: str, limit: int = 5, client: AIClient | None = None) -> tuple[str, list[dict[str, Any]]]:
+        context, memories = self.build_context(query, limit)
+        ai = client or AIClient()
+        if not ai.enabled:
+            return f"未配置 AI_API_KEY，以下是检索到的知识库上下文：\n\n{context}", memories
+        try:
+            answer = ai.ask([{"role": "system", "content": "你是个人知识助手。优先依据历史记忆回答；历史内容不足时明确说明。不要把推测写成历史事实。"}, {"role": "user", "content": f"历史知识：\n{context}\n\n用户问题：{query}"}])
+        except RuntimeError as exc:
+            answer = f"AI 调用失败（{exc}）。以下是已检索到的知识库上下文：\n\n{context}"
+        return answer, memories
+
+    def show(self, memory_id: str) -> str:
+        row = self.conn.execute("SELECT path FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        if not row:
+            raise KeyError(f"memory not found: {memory_id}")
+        path = self.s.knowledge_root / row["path"]
+        if not path.exists():
+            raise FileNotFoundError(path)
+        return path.read_text(encoding="utf-8")
+
+    def process(self, candidate_file: Path | None = None) -> list[str]:
+        self.init()
+        if candidate_file is None:
+            files = sorted((self.s.knowledge_root / "02_Candidate").glob("*-candidates.json"))
+            candidate_file = files[-1] if files else self.extract()
+        elif not candidate_file.exists():
+            candidate_file = self.s.knowledge_root / "02_Candidate" / candidate_file
+        candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
+        outcomes = []
+        for candidate in candidates:
+            matches = self.search(candidate["title"], 1)
+            if matches and self._similar(matches[0]["title"], candidate["title"]):
+                row = matches[0]
+                path = self.s.knowledge_root / row["path"]
+                meta, old_body = parse_frontmatter(path.read_text(encoding="utf-8"))
+                merged = old_body.rstrip() + f"\n\n## 更新 {candidate['source_date']}\n\n{candidate['content']}"
+                meta["updated_at"] = candidate["source_date"]
+                path.write_text(dump_frontmatter(meta, merged), encoding="utf-8")
+                self._upsert_meta(meta, row["path"], candidate["source_date"])
+                action, memory_id = "update", row["id"]
+            else:
+                memory_id = f"{slugify(candidate['title'])}-{uuid.uuid4().hex[:8]}"
+                rel = Path("03_Memory") / candidate.get("category", "General") / f"{memory_id}.md"
+                target = self.s.knowledge_root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                now = candidate["source_date"]
+                meta = {"id": memory_id, "title": candidate["title"], "category": candidate.get("category", "General"), "subcategory": candidate.get("subcategory") or "", "tags": candidate.get("tags", []), "summary": candidate.get("summary", ""), "status": "active", "memory_level": "long_term", "score": sum(candidate.get("score", {}).values()), "created_at": now, "updated_at": now, "source_dates": [now]}
+                target.write_text(dump_frontmatter(meta, f"# {candidate['title']}\n\n{candidate['content']}"), encoding="utf-8")
+                self._upsert_meta(meta, rel.as_posix(), now)
+                action = "create"
+            self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, "local heuristic decision", json.dumps(candidate, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
+            self.conn.commit()
+            outcomes.append(f"{action}: {candidate['title']}")
+        self.rebuild_index()
+        return outcomes
+
+    @staticmethod
+    def _similar(a: str, b: str) -> bool:
+        aa, bb = set(a.lower()), set(b.lower())
+        return bool(aa and bb and len(aa & bb) / max(1, len(aa | bb)) >= 0.45)
+
+    def _upsert_meta(self, meta: dict[str, Any], rel: str, now: str) -> None:
+        subcategory = meta.get("subcategory", "")
+        if isinstance(subcategory, list):
+            subcategory = ", ".join(str(x) for x in subcategory)
+        self.conn.execute("INSERT INTO memories(id,title,category,subcategory,tags,summary,path,score,memory_level,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,category=excluded.category,subcategory=excluded.subcategory,tags=excluded.tags,summary=excluded.summary,path=excluded.path,score=excluded.score,memory_level=excluded.memory_level,status=excluded.status,updated_at=excluded.updated_at", (meta["id"], meta.get("title", meta["id"]), meta.get("category", "General"), subcategory, json.dumps(meta.get("tags", []), ensure_ascii=False), meta.get("summary", ""), rel, int(meta.get("score") or 0), meta.get("memory_level", "long_term"), meta.get("status", "active"), meta.get("created_at", now), meta.get("updated_at", now)))
+        self.conn.commit()
+
+    def rebuild_index(self) -> int:
+        count = 0
+        for path in (self.s.knowledge_root / "03_Memory").rglob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            meta, body = parse_frontmatter(text)
+            if not meta.get("id"):
+                # Legacy Dianjia notes predate frontmatter; index their inline metadata.
+                title_match = re.search(r"^#\s+(.+)$", body, re.M)
+                id_match = re.search(r"memory_id[：:]\s*`?([\w.-]+)", body, re.I)
+                category_match = re.search(r"一级分类[：:]\s*([^\n*]+)", body)
+                meta = {"id": id_match.group(1) if id_match else slugify(path.stem), "title": title_match.group(1).strip() if title_match else path.stem, "category": category_match.group(1).strip() if category_match else path.parent.name, "summary": "", "tags": [], "status": "active", "memory_level": "long_term", "created_at": date.today().isoformat(), "updated_at": date.today().isoformat(), "score": 0}
+            self._upsert_meta(meta, path.relative_to(self.s.knowledge_root).as_posix(), meta.get("updated_at", date.today().isoformat()))
+            count += 1
+        self._write_index()
+        return count
+
+    def _write_index(self) -> None:
+        grouped: dict[str, list[tuple[str, str]]] = {}
+        for row in self.conn.execute("SELECT title, category, path FROM memories WHERE status = 'active' ORDER BY category, title"):
+            grouped.setdefault(row["category"], []).append((row["title"], row["path"]))
+        lines = ["# Dianjia Knowledge Index", "", "Automatically generated from active Markdown memories.", ""]
+        for category, items in grouped.items():
+            lines += [f"## {category}", ""]
+            lines.extend(f"- [{title}]({path})" for title, path in items)
+            lines.append("")
+        (self.s.knowledge_root / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
+
+    def status(self) -> dict[str, int]:
+        return {"sources": self.conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0], "memories": self.conn.execute("SELECT COUNT(*) FROM memories WHERE status='active'").fetchone()[0], "actions": self.conn.execute("SELECT COUNT(*) FROM memory_actions").fetchone()[0]}

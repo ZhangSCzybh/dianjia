@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+import json
+import mimetypes
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from .config import settings
+from .services import MemoryService
+
+WEB_ROOT = Path(__file__).resolve().parent.parent / "web"
+
+
+class Handler(BaseHTTPRequestHandler):
+    service = MemoryService(settings)
+
+    def _send(self, payload, status=HTTPStatus.OK, content_type="application/json; charset=utf-8"):
+        data = payload if isinstance(payload, bytes) else (json.dumps(payload, ensure_ascii=False).encode("utf-8") if content_type.startswith("application/json") else str(payload).encode("utf-8"))
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _json(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        return json.loads(self.rfile.read(length) or b"{}")
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        try:
+            if parsed.path == "/":
+                self._send((WEB_ROOT / "index.html").read_bytes(), content_type="text/html; charset=utf-8")
+            elif parsed.path == "/api/status":
+                self._send(self.service.status())
+            elif parsed.path == "/api/search":
+                query = parse_qs(parsed.query).get("q", [""])[0]
+                limit = int(parse_qs(parsed.query).get("limit", [10])[0])
+                self._send([dict(row) for row in self.service.search(query, limit)] if query else [])
+            else:
+                self._send({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+        except Exception as exc:
+            self._send({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def do_POST(self):
+        try:
+            if self.path == "/api/ingest":
+                payload = self._json()
+                text = str(payload.get("content", "")).strip()
+                if not text:
+                    return self._send({"error": "content is required"}, HTTPStatus.BAD_REQUEST)
+                path = self.service.ingest_text(text, payload.get("name", "web-input"), payload.get("date"), "web")
+                self._send({"path": str(path)})
+            elif self.path == "/api/daily":
+                payload = self._json()
+                self._send({"path": str(self.service.daily(payload.get("date")))})
+            elif self.path == "/api/extract":
+                payload = self._json()
+                self._send({"path": str(self.service.extract(payload.get("date")))})
+            elif self.path == "/api/process":
+                payload = self._json()
+                candidate = payload.get("candidate_file")
+                self._send({"outcomes": self.service.process(Path(candidate) if candidate else None)})
+            elif self.path == "/api/run-daily":
+                payload = self._json()
+                self._send({"outcomes": self.service.run_daily(payload.get("date"))})
+            elif self.path == "/api/ask":
+                payload = self._json()
+                question = str(payload.get("question", "")).strip()
+                if not question:
+                    return self._send({"error": "question is required"}, HTTPStatus.BAD_REQUEST)
+                answer, memories = self.service.ask(question, int(payload.get("limit", 5)))
+                self._send({"answer": answer, "memories": memories})
+            elif self.path == "/api/rebuild-index":
+                self._send({"count": self.service.rebuild_index()})
+            else:
+                self._send({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+        except Exception as exc:
+            self._send({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def log_message(self, format, *args):
+        print(f"[web] {self.address_string()} - {format % args}")
+
+
+def serve(host: str = "127.0.0.1", port: int = 8765):
+    Handler.service.init()
+    server = ThreadingHTTPServer((host, port), Handler)
+    print(f"Dianjia Web: http://{host}:{port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping Dianjia Web")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    serve()
+

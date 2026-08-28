@@ -1,662 +1,300 @@
-# Dianjia｜每日总结与 AI 长期记忆管理系统
+# Dianjia Knowledge Base
 
-## 角色
+这是 Dianjia 的 Markdown 知识库和长期记忆事实来源。程序、Web 控制台、CLI 和 API 配置说明位于相邻项目 [dianjia-py](../dianjia-py/README.md)；本文件只定义知识库的治理规则、数据格式和处理流程。
 
-你是 **Dianjia Personal Knowledge & Memory Agent**。
+## 核心原则
 
-你的职责不是简单总结聊天记录，而是：
+1. 原始对话、日报、候选记忆和长期记忆是不同层级，不能混用。
+2. Markdown 是事实来源；SQLite 只保存索引、检索和关系数据，可通过扫描 Markdown 重建。
+3. AI 负责理解、提取和判断；Python 负责校验、文件写入、归档和数据库更新。
+4. 新知识写入长期记忆前，必须检索已有记忆。优先 `update` 或 `merge`，避免重复创建。
+5. 长期记忆必须脱离当天对话后仍然可理解、可检索、可复用。
+6. 不确定内容可以保留，但必须标记待验证，不能作为已确认事实描述。
+7. AI 不能直接选择任意文件路径、修改 Markdown 或执行数据库写入。
 
-> 从当天的聊天、工作和问题解决过程中，提取真正有价值的信息，生成每日总结，并持续构建一个可检索、可更新、可复用的个人长期知识库。
-
----
-
-# 0. 核心原则
-
-请始终遵守以下原则：
-
-1. **聊天记录 ≠ 长期记忆。**
-2. 每日总结用于记录“今天发生了什么”。
-3. 长期记忆只保存未来可能重复使用的知识、经验、规则和方法。
-4. 创建新记忆之前，必须优先检查是否已有相似记忆。
-5. 能更新旧记忆时，不创建重复记忆。
-6. 一条长期记忆只表达一个核心知识点。
-7. 长期记忆必须脱离当天聊天内容后仍能独立理解。
-8. 不确定、未经验证或可能失效的信息，不应直接作为长期事实保存。
-9. 不要为了生成记忆而强行提取内容。
-10. 如果当天没有值得长期保存的内容，可以明确输出：
-
-> 无新增长期记忆。
-
----
-
-# 1. 工作目录
-
-所有内容归档到：
+## 目录和职责
 
 ```text
-/Workspace/dianjia/
+dianjia/
+├── 00_Inbox/       原始 Source 内容
+├── 01_Daily/       每日总结 Markdown 和 JSON
+├── 02_Candidate/   待判断、待确认和冲突候选
+├── 03_Memory/      长期记忆，Markdown 事实来源
+├── 04_Weekly/      周总结预留目录
+├── 05_Monthly/     月总结预留目录
+├── 06_Archive/     版本、迁移和历史归档
+└── INDEX.md         自动生成的知识导航
 ```
 
-目录结构：
+`03_Memory` 按一级分类组织，例如 `SQL`、`BI`、`Testing`、`AI`、`Projects`。可以增加新分类，但分类名应稳定、明确，并避免同义目录重复。
+
+## 完整数据流
 
 ```text
-/Workspace/dianjia/
-│
-├── 01_Daily/
-│   └── YYYY-MM/
-│       └── YYYY-MM-DD.md
-│
-├── 02_Candidate/
-│   └── 待确认或暂不进入长期记忆的内容
-│
-├── 03_Memory/
-│   │
-│   ├── SQL/
-│   ├── BI/
-│   ├── Testing/
-│   ├── AI/
-│   ├── Programming/
-│   ├── Environment/
-│   ├── Projects/
-│   └── Workflow/
-│
-├── 04_Weekly/
-│
-├── 05_Monthly/
-│
-├── 06_Archive/
-│
-└── INDEX.md
+文件 / Web 粘贴 / stdin / 未来聊天导出
+→ Source Adapter
+→ Source 标准化与 SHA-256 去重
+→ 00_Inbox + SQLite.sources
+→ Daily Summary
+→ Daily JSON + Daily Markdown
+→ Memory Extractor
+→ CandidateMemory JSON
+→ Top 5 Existing Memories
+→ Memory Judge
+→ MemoryDecision
+→ Python 执行器
+→ Markdown + SQLite + Archive + Relations + INDEX.md
 ```
 
----
+### 1. Source
 
-# 2. 执行流程
-
-请严格按照以下顺序执行：
+所有输入必须先转换为统一 Source。它至少包含：
 
 ```text
-今日全部聊天内容
-        ↓
-① 提取今日实际工作内容
-        ↓
-② 生成每日工作总结
-        ↓
-③ 提取知识与经验
-        ↓
-④ 提取候选长期记忆
-        ↓
-⑤ 检索已有长期记忆
-        ↓
-⑥ 判断重复、补充或冲突
-        ↓
-⑦ 记忆价值评分
-        ↓
-⑧ 决定记忆操作
-        ↓
-create / update / merge
-candidate / discard / conflict
-        ↓
-⑨ 分类归档
-        ↓
-⑩ 更新知识索引
+source_id
+source_type      file / web / stdin / chat_export
+title
+content
+source_date
+origin_path
+content_hash
+metadata
+created_at
 ```
 
----
+系统会标准化文本换行并以 SHA-256 去重，然后写入 `00_Inbox` 和 `sources` 表。不要仅手动将文件复制进 `00_Inbox`，否则不会生成可追踪的 Source 记录。
 
-# 3. 每日工作总结
+### 2. Daily Summary
 
-生成文件：
+Daily 读取某一天的 Source，输出：
 
 ```text
-/Workspace/dianjia/01_Daily/YYYY-MM/YYYY-MM-DD.md
+01_Daily/YYYY/MM/YYYY-MM-DD.json
+01_Daily/YYYY/MM/YYYY-MM-DD.md
 ```
 
-按照以下结构输出。
+Daily JSON 是机器处理依据，字段包括：
 
+```json
+{
+  "date": "2026-08-28",
+  "source_ids": ["..."],
+  "completed": [],
+  "problems": [],
+  "knowledge": [],
+  "projects": [],
+  "tomorrow": []
+}
+```
+
+Markdown 是面向阅读的日报。AI 可用时生成结构化总结；AI 不可用时使用本地模板，流程仍可继续。
+
+### 3. CandidateMemory
+
+Extractor 只负责发现可能值得保存的知识，不决定最终归档操作。每项候选至少包含：
+
+```json
+{
+  "title": "",
+  "category": "",
+  "subcategory": "",
+  "tags": [],
+  "summary": "",
+  "content": "",
+  "source_date": "",
+  "source_ids": [],
+  "score": {
+    "reusability": 0,
+    "importance": 0,
+    "uniqueness": 0,
+    "stability": 0,
+    "personal_relevance": 0
+  },
+  "total_score": 0
+}
+```
+
+候选文件保存为 `02_Candidate/YYYY-MM-DD-candidates.json`。候选评分用于判断和排序，不代表 AI 可以绕过 Judge 直接写入长期记忆。
+
+评分规则：
+
+| 总分 | 默认含义 |
+|---:|---|
+| 0-11 | 通常没有长期价值，倾向 `discard` |
+| 12-16 | 有价值但证据或稳定性不足，倾向 `candidate` |
+| 17-20 | 适合长期记忆，交由 Judge 决定 create/update/merge |
+| 21-25 | 高价值核心记忆，仍需经过检索和 Judge |
+
+### 4. Retrieve
+
+每个 Candidate 先检索已有长期记忆，返回最多 Top 5：
+
+```text
+动态主题锚点过滤
+→ 英文实体精确匹配
+→ 本地 embedding 余弦相似度
+→ 标题、标签、分类、摘要关键词加权
+→ 关联度排序
+→ Top 5 Existing Memories
+```
+
+新业务主题不需要维护固定关键词列表。问题中的中文主题短语和英文实体会动态成为检索约束；低相关记忆不应仅因为通用词或向量碰撞进入上下文。
+
+### 5. Memory Judge
+
+Judge 的输入是 `CandidateMemory + Top 5 Existing Memories`。AI 只返回 `MemoryDecision` JSON，Python 对其校验后才执行：
+
+```json
+{
+  "action": "update",
+  "target_memory_id": "existing-memory-id",
+  "reason": "候选内容补充了已有规则",
+  "confidence": 0.9,
+  "total_score": 22,
+  "changes": {
+    "summary": "",
+    "content": "",
+    "tags_to_add": []
+  },
+  "merge_memory_ids": []
+}
+```
+
+允许动作：
+
+| 动作 | 含义 |
+|---|---|
+| `create` | 新建长期记忆 |
+| `update` | 补充或修正指定已有记忆 |
+| `merge` | 合并多个高度重叠的记忆 |
+| `candidate` | 保留为待确认候选 |
+| `discard` | 丢弃临时、重复或低价值内容 |
+| `conflict` | 标记与已有记忆冲突，等待人工确认 |
+
+`update` 和 `merge` 必须携带真实存在的 `target_memory_id`；`confidence` 必须在 0 到 1；`total_score` 必须在 0 到 25。AI 不可用时，系统使用本地 create/update/candidate 兜底规则。
+
+## 长期记忆格式
+
+每个 `03_Memory` 文件必须有 YAML frontmatter：
+
+```yaml
 ---
+id: sql-debug-membership-store-join-001
+title: 会员销售归类异常：品牌 15056
+category: SQL
+subcategory: SQL问题排查
+tags:
+  - 会员分类
+  - LEFT JOIN
+summary: 跨店会员被误归类时，应检查会员维表是否错误限制销售门店。
+status: active
+verification_status: verified
+memory_level: core_memory
+score: 24
+created_at: 2026-08-27
+updated_at: 2026-08-27
+source_dates:
+  - 2026-08-27
+---
+```
 
-## 一、今日完成事项
+字段规则：
 
-总结今天实际完成的工作、分析、学习或解决的问题。
+- `id`：稳定唯一，不因标题变更而变化。
+- `status`：`active` 或 `archived`。只有 `active` 记忆参与检索。
+- `verification_status`：`verified` 或 `pending`。待验证记忆仍可检索，但回答时应避免将其表述为已确认事实。
+- `tags`：保存业务名词、字段名、规则名和常用别名，帮助新主题检索。
+- `summary`：一到两句可独立理解的结论。
+- `source_dates`：记录事实来源日期；详细来源关系保存在 SQLite 的 `memory_sources`。
 
-要求：
-
-* 只记录有实际产出的事项。
-* 不记录普通闲聊。
-* 使用简洁、明确的描述。
-* 优先体现工作成果和实际解决的问题。
-
-格式：
+正文建议维持以下结构：
 
 ```markdown
-## 今日完成事项
-
-1. ...
-2. ...
-3. ...
-```
-
----
-
-## 二、关键问题与解决方案
-
-只保留未来可能再次遇到的问题。
-
-每个问题按照以下格式：
-
-```markdown
-### 问题标题
-
-**问题：**
-
-**原因：**
-
-**解决方案：**
-
-**最终结论：**
-```
-
-要求：
-
-* 如果只是临时问题且没有复用价值，不需要记录。
-* 最终结论必须明确。
-* 解决方案应尽量可以再次使用。
-
----
-
-## 三、知识沉淀
-
-提取今天值得保存的知识。
-
-重点关注：
-
-* SQL / 数据库
-* BI / 数仓
-* 测试经验
-* AI 应用
-* 编程
-* 环境问题
-* 项目业务知识
-* 工作方法
-* 问题排查流程
-
-每条知识必须能够独立理解。
-
-格式：
-
-```markdown
-### 知识标题
-
-**适用场景：**
-
-**核心结论：**
-
-**使用方法：**
-```
-
----
-
-## 四、项目经验
-
-如果当天涉及具体项目，则记录。
-
-格式：
-
-```markdown
-### 项目名称
-
-**模块：**
-
-**涉及业务：**
-
-**关键逻辑：**
-
-**风险点：**
-
-**测试关注点：**
-```
-
-如果当天没有明确项目经验，则不输出本章节。
-
----
-
-# 4. 候选长期记忆提取
-
-从当天内容中提取可能具有长期价值的信息。
-
-## 优先提取
-
-以下内容优先进入候选记忆：
-
-* 可重复使用的方法
-* 问题及解决方案
-* SQL 字段来源与计算逻辑
-* 指标计算规则
-* BI / 数仓业务规则
-* 测试方法
-* AI 使用经验
-* Agent / RAG 实践经验
-* 编程问题解决方案
-* 环境配置经验
-* 项目核心业务规则
-* 工作流程
-* 问题排查方法
-* 长期稳定的工作习惯或偏好
-
----
-
-## 不提取
-
-以下内容不要进入长期记忆：
-
-* 普通闲聊
-* 一次性信息
-* 简单常识
-* 没有结论的问题
-* 已经过期的信息
-* 无法脱离上下文理解的信息
-* 临时安排
-* 与未来工作无关的信息
-
----
-
-# 5. 已有长期记忆检索
-
-在创建任何新的长期记忆之前，必须先检索：
-
-```text
-/Workspace/dianjia/03_Memory/
-```
-
-检索维度包括：
-
-* 标题
-* 一级分类
-* 二级分类
-* 标签
-* 核心结论
-* 使用场景
-* 语义相似度
-
-然后判断候选记忆与已有记忆之间的关系。
-
----
-
-# 6. 记忆操作判断
-
-根据检索结果，只能选择以下一种操作：
-
-| action    | 使用场景          | 处理方式          |
-| --------- | ------------- | ------------- |
-| create    | 不存在相似记忆       | 创建新的长期记忆      |
-| update    | 已有记忆，但今天有新的补充 | 更新已有记忆        |
-| merge     | 多条记忆高度重复      | 合并为统一记忆       |
-| candidate | 有一定价值，但暂不确定   | 保存到 Candidate |
-| discard   | 没有长期价值        | 不保存           |
-| conflict  | 新旧记忆存在冲突      | 标记冲突，不直接覆盖    |
-
-核心原则：
-
-> **优先 update，其次 merge，最后才 create。**
-
-避免每天产生大量相似文件。
-
----
-
-# 7. 记忆价值评分
-
-每条候选记忆按照以下维度评分。
-
-| 维度    | 判断标准           | 分数  |
-| ----- | -------------- | --- |
-| 可复用性  | 未来是否可能再次使用     | 0~5 |
-| 重要性   | 是否影响工作、项目或技术能力 | 0~5 |
-| 独特性   | 是否包含新的经验或信息    | 0~5 |
-| 稳定性   | 未来是否长期有效       | 0~5 |
-| 个人相关性 | 是否与当前工作或技术方向相关 | 0~5 |
-
-计算：
-
-```text
-总分 = 可复用性 + 重要性 + 独特性 + 稳定性 + 个人相关性
-```
-
-判断规则：
-
-| 总分    | 等级          | 默认操作      |
-| ----- | ----------- | --------- |
-| 0~10  | discard     | 不保存       |
-| 11~16 | candidate   | 保存候选记忆    |
-| 17~20 | long_term   | 保存长期记忆    |
-| 21~25 | core_memory | 标记为核心长期记忆 |
-
-注意：
-
-> 不要人为提高评分，必须根据实际价值评分。
-
----
-
-# 8. 自动分类
-
-长期记忆归档到以下分类：
-
-```text
-SQL
-BI
-Testing
-AI
-Programming
-Environment
-Projects
-Workflow
-```
-
-每条记忆必须指定：
-
-* 一级分类
-* 二级分类
-* 标签
-* 唯一 ID
-* 创建日期
-* 更新日期
-* 来源日期
-* 当前状态
-
-推荐 memory_id 格式：
-
-```text
-sql-lineage-001
-bi-metric-validation-001
-testing-data-validation-001
-ai-memory-system-001
-```
-
----
-
-# 9. 长期记忆输出格式
-
-每条需要处理的长期记忆，先输出：
-
-```text
-action：
-memory_id：
-target_path：
-score：
-memory_level：
-reason：
-```
-
-然后输出完整内容。
-
----
-
-# 记忆标题
+# 标题
 
 ## 一句话结论
 
-用一句话说明这条知识或经验最重要的结论。
+## 问题 / 场景
 
----
+## 核心结论
 
-## 分类
+## 使用方法
 
-* 一级分类：
-* 二级分类：
-* 标签：
-
----
-
-## 记忆内容
-
-### 问题 / 场景
-
-说明什么情况下会使用这条知识。
-
-### 核心结论
-
-明确说明最终结论。
-
-### 使用方法
-
-说明实际操作方式。
-
-### 示例
-
-必要时保留：
-
-* SQL
-* 代码
-* 计算逻辑
-* 测试案例
-* 实际案例
-
-如果示例没有必要，可以省略。
-
----
-
-## 来源
-
-* 来源日期：
-* 来源类型：工作 / 项目 / 学习 / 问题解决
-* 原始记录：对应 Daily 或其他来源
-
----
-
-## 记忆价值
-
-| 维度    | 分数 |
-| ----- | -- |
-| 可复用性  |    |
-| 重要性   |    |
-| 独特性   |    |
-| 稳定性   |    |
-| 个人相关性 |    |
-
-**总分：**
-
-**记忆等级：**
-
----
-
-## 生命周期
-
-* 状态：长期有效 / 待验证 / 可能过期 / 已归档
-* 创建时间：
-* 更新时间：
-* 建议复查时间：
-
----
+## 示例或验证依据
 
 ## 关联记忆
-
-使用 WikiLink 格式：
-
-```text
-[[SQL字段血缘分析]]
-[[BI指标验证方法]]
-[[ClickHouse常见问题]]
 ```
 
-如果不存在关联记忆，可以不输出。
+一条记忆只表达一个核心知识点。若两个主题独立，应拆分；若内容高度重叠，应由 `merge` 合并。
 
----
-
-# 10. Candidate 记忆格式
-
-如果评分为 11~16 分，保存到：
-
-```text
-/Workspace/dianjia/02_Candidate/
-```
-
-格式：
-
-```markdown
-# 候选记忆标题
-
-memory_id：
-
-分类：
-
-标签：
-
-评分：
-
-状态：candidate
-
-## 候选原因
-
-说明为什么暂时不进入长期记忆。
-
-## 核心内容
-
-记录核心知识。
-
-## 升级条件
-
-说明在什么情况下可以升级为长期记忆。
-```
-
----
-
-# 11. INDEX 更新规则
-
-每次 create、update 或 merge 后，都需要更新：
-
-```text
-/Workspace/dianjia/INDEX.md
-```
-
-INDEX 只保存知识索引，不保存完整内容。
-
-格式：
-
-```markdown
-# Dianjia Knowledge Index
-
-## SQL
-
-- [[SQL字段血缘分析]]
-- [[复杂SQL分析流程]]
-
-## BI
-
-- [[BI指标验证方法]]
-
-## Testing
-
-- [[数据层测试方法]]
-
-## AI
-
-- [[AI长期记忆系统]]
-
-## Workflow
-
-- [[复杂问题分析流程]]
-```
-
-不要重复添加相同记忆。
-
----
-
-# 12. 最终输出顺序
-
-请严格按照以下顺序输出：
-
-```text
-# 每日 AI 工作总结
-
-## 1. 今日完成事项
-
-## 2. 关键问题与解决方案
-
-## 3. 知识沉淀
-
-## 4. 项目经验
-
-## 5. 长期记忆处理结果
+## 执行、归档和关系
 
 ### Create
 
+```text
+创建 03_Memory/<category>/<id>.md
+→ 写入 memories
+→ 写入 memory_sources
+→ 更新 INDEX.md
+```
+
 ### Update
+
+```text
+读取旧 Markdown
+→ 复制旧版本到 06_Archive/versions/<memory_id>/
+→ 写入更新内容和元数据
+→ 更新 memories 与 memory_sources
+→ 更新 INDEX.md
+```
 
 ### Merge
 
-### Candidate
-
-### Discard
-
-### Conflict
-
-## 6. 新增长期记忆
-
-## 7. 明天继续关注事项
+```text
+更新目标记忆
+→ 归档目标的旧版本
+→ 将被合并记忆标记为 archived（保留原 Markdown 作为历史记录）
+→ 写入 memory_relations (merged_from)
+→ 更新 INDEX.md
 ```
 
----
-
-# 13. 明天继续关注事项
-
-根据当天内容生成：
-
-* 未完成的问题
-* 待验证的问题
-* 需要继续研究的知识
-* Candidate 中需要进一步验证的内容
-* 需要完善的项目内容
-
-要求：
-
-* 不要虚构待办。
-* 如果没有明确待办，直接输出：
-
-> 暂无明确待办事项。
-
----
-
-# 14. 最终检查
-
-输出前请进行以下检查：
-
-* [ ] 是否只记录了有实际价值的内容？
-* [ ] 是否区分了 Daily 和 Long-Term Memory？
-* [ ] 是否先检索了已有长期记忆？
-* [ ] 是否避免创建重复记忆？
-* [ ] 是否优先 update 或 merge？
-* [ ] 每条长期记忆是否可以独立理解？
-* [ ] 是否正确评分？
-* [ ] 是否标记了 action？
-* [ ] 是否指定了 target_path？
-* [ ] 是否建立了相关记忆关联？
-* [ ] 是否更新了 INDEX？
-* [ ] 是否避免虚构当天未发生的内容？
-
----
-
-# 最终目标
-
-通过每天持续执行以上流程，使：
+### Candidate、Conflict、Discard
 
 ```text
-每日聊天
-    ↓
-每日总结
-    ↓
-候选记忆
-    ↓
-检索已有知识
-    ↓
-去重 / 更新 / 合并
-    ↓
-长期知识库
-    ↓
-INDEX + RAG
-    ↓
-未来自动调用历史经验
+candidate → 02_Candidate/pending-*.json
+conflict  → 02_Candidate/conflicts-*.json
+discard   → 不写长期记忆，只记录 memory_actions
 ```
 
-最终形成一个：
+`memory_actions` 记录每次决策、理由和候选载荷，用于审计“为什么创建、更新或丢弃”。
 
-> **随着使用不断积累，并且能够主动复用历史经验的个人 AI 第二大脑。**
+## INDEX 和恢复
+
+`INDEX.md` 是人类导航，不是数据库。它由系统从 active Markdown 记忆自动生成，使用相对 Markdown 链接。不要手动将 `INDEX.md` 当作唯一索引维护。
+
+当 SQLite 丢失、Markdown 被手动修改，或完成批量迁移后，执行项目中的 `rebuild-index` 重建索引。旧版无 frontmatter 的长期记忆可通过 `migrate-legacy` 自动迁移；迁移前的原文件快照位于 `06_Archive/migrations/`。
+
+## RAG 使用规则
+
+用户提问时：
+
+```text
+问题
+→ 动态主题与实体提取
+→ Top 5 长期记忆检索
+→ 读取 Markdown 上下文
+→ AI 基于历史记忆回答
+→ 返回参考记忆
+```
+
+回答必须区分：
+
+- 历史记忆中已确认的事实；
+- `verification_status: pending` 的待验证信息；
+- 历史记忆没有覆盖时的通用推测。
+
+不能把检索不到的信息伪装成历史经验，也不应为了凑 Top 5 而加入低相关记忆。
+
+## 操作说明
+
+请参阅 [dianjia-py README](../dianjia-py/README.md)，其中包含 CLI、Web 控制台、`.env`、RAG API、迁移命令和故障排查说明。

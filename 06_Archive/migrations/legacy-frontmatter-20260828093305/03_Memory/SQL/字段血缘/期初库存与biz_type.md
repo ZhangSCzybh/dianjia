@@ -1,25 +1,3 @@
----
-id: sql-lineage-opening-inventory-001
-title: 期初库存与 biz_type
-category: SQL
-subcategory: 字段血缘
-tags:
-  - biz_type
-  - 期初库存
-  - 销售数量
-  - 数据质量
-summary: 期初库存的来源可由 `biz_type` 区分；表的 ClickHouse 替换去重键为 `bill_date, brand_id, storage_id, sku_id, source_id, key_id`，业务唯一键是否需额外包含 `biz_type` 必须另行确认。
-status: active
-memory_level: long_term
-score: 20
-created_at: 2026-08-27
-updated_at: 2026-08-27
-source_dates:
-  - 2026-08-27
-migrated_from: legacy_inline_metadata
-verification_status: pending
----
-
 # 期初库存与 biz_type
 
 ## 一句话结论
