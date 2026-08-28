@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ask", help="Retrieve knowledge and answer a question"); p.add_argument("question"); p.add_argument("--limit", type=int, default=5); p.add_argument("--context-only", action="store_true", help="Only print retrieved context")
     p = sub.add_parser("show"); p.add_argument("memory_id")
     sub.add_parser("rebuild-index")
+    sub.add_parser("migrate-legacy", help="Add frontmatter to legacy Markdown memories")
     sub.add_parser("status")
     p = sub.add_parser("web", help="Start the local web console"); p.add_argument("--host", default="127.0.0.1"); p.add_argument("--port", type=int, default=8765)
     return parser
@@ -59,6 +60,11 @@ def main() -> None:
     elif args.command == "show": print(service.show(args.memory_id))
     elif args.command == "run-daily": print("\n".join(service.run_daily(args.date)))
     elif args.command == "rebuild-index": print(f"Indexed {service.rebuild_index()} memories")
+    elif args.command == "migrate-legacy":
+        from .migration import migrate_legacy_memories
+        migrated = migrate_legacy_memories(settings.knowledge_root)
+        print(f"Migrated {len(migrated)} memories")
+        print(f"Indexed {service.rebuild_index()} memories")
     elif args.command == "status": print(service.status())
     elif args.command == "web":
         from .web import serve

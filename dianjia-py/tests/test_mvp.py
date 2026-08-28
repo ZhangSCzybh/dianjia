@@ -5,6 +5,7 @@ from pathlib import Path
 from app.config import Settings
 from app.services import MemoryService
 from app.markdown import dump_frontmatter
+from app.migration import migrate_legacy_memories
 
 
 class MvpTest(unittest.TestCase):
@@ -55,6 +56,22 @@ class MvpTest(unittest.TestCase):
         # An unseen topic is handled without adding a hard-coded topic list.
         self.assertFalse(MemoryService._matches_topic("DRP 权限问题", "库存同步和成本计算"))
         self.assertTrue(MemoryService._matches_topic("DRP 权限问题", "DRP 权限配置和登录"))
+
+    def test_legacy_migration_adds_frontmatter_and_keeps_body(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            memory = root / "kb/03_Memory/SQL/legacy.md"
+            memory.parent.mkdir(parents=True)
+            body = "# 旧知识\n\n## 一句话结论\n\n结论。\n\n## 分类\n\n* 一级分类：SQL\n* 二级分类：排查\n* 标签：SQL、Join\n* memory_id：`legacy-001`\n\n**总分：20**\n"
+            memory.write_text(body, encoding="utf-8")
+            migrated = migrate_legacy_memories(root / "kb")
+            self.assertEqual(migrated, [memory])
+            meta, migrated_body = __import__("app.markdown", fromlist=["parse_frontmatter"]).parse_frontmatter(memory.read_text(encoding="utf-8"))
+            self.assertEqual(meta["id"], "legacy-001")
+            self.assertEqual(meta["tags"], ["SQL", "Join"])
+            self.assertEqual(meta["status"], "active")
+            self.assertEqual(migrated_body.rstrip(), body.rstrip())
+            self.assertTrue(list((root / "kb/06_Archive/migrations").rglob("legacy.md")))
 
 
 if __name__ == "__main__":

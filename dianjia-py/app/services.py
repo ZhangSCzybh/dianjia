@@ -13,6 +13,7 @@ from .config import Settings
 from .database import connect
 from .markdown import dump_frontmatter, parse_frontmatter, slugify
 from .ai.client import AIClient
+from .models import MemoryDecision, Source
 
 
 class MemoryService:
@@ -31,22 +32,23 @@ class MemoryService:
     def ingest(self, source: Path, source_date: str | None = None) -> Path:
         self.init()
         content = source.read_text(encoding="utf-8")
-        return self.ingest_text(content, source.stem, source_date, "file")
+        return self.ingest_text(content, source.stem, source_date, "file", str(source))
 
-    def ingest_text(self, content: str, name: str = "conversation", source_date: str | None = None, source_type: str = "text") -> Path:
-        """Import text directly, allowing clipboard/stdin integrations."""
+    def ingest_text(self, content: str, name: str = "conversation", source_date: str | None = None, source_type: str = "text", origin_path: str | None = None) -> Path:
+        """Normalize any input adapter into a Source, then persist it."""
         self.init()
-        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
-        existing = self.conn.execute("SELECT path FROM sources WHERE content_hash = ?", (digest,)).fetchone()
+        normalized = content.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+        source = Source.create(normalized, name.strip() or "conversation", source_type, source_date, origin_path)
+        existing = self.conn.execute("SELECT path FROM sources WHERE content_hash = ?", (source.content_hash,)).fetchone()
         if existing:
             return self.s.knowledge_root / existing["path"]
-        day = source_date or date.today().isoformat()
-        target = self.s.knowledge_root / "00_Inbox" / f"{day}--{slugify(name)}.md"
+        day = source.source_date
+        target = self.s.knowledge_root / "00_Inbox" / f"{day}--{slugify(source.title)}.md"
         if target.exists():
-            target = target.with_name(f"{day}--{slugify(name)}-{digest[:8]}.md")
-        target.write_text(content, encoding="utf-8")
+            target = target.with_name(f"{day}--{slugify(source.title)}-{source.content_hash[:8]}.md")
+        target.write_text(source.content, encoding="utf-8")
         rel = target.relative_to(self.s.knowledge_root).as_posix()
-        self.conn.execute("INSERT INTO sources VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), source_type, digest, rel, day, datetime.now().isoformat(timespec="seconds")))
+        self.conn.execute("INSERT INTO sources(id, source_type, content_hash, path, source_date, created_at, title, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (source.source_id, source.source_type, source.content_hash, rel, source.source_date, source.created_at, source.title, json.dumps(source.metadata, ensure_ascii=False)))
         self.conn.commit()
         return target
 
@@ -68,32 +70,66 @@ class MemoryService:
     def daily(self, day: str | None = None) -> Path:
         self.init()
         day = day or date.today().isoformat()
-        rows = self.conn.execute("SELECT path FROM sources WHERE source_date = ? ORDER BY path", (day,)).fetchall()
+        rows = self.conn.execute("SELECT id, path FROM sources WHERE source_date = ? ORDER BY path", (day,)).fetchall()
         entries = []
+        source_ids = []
         for row in rows:
             path = self.s.knowledge_root / row["path"]
             if path.exists():
                 entries.append(path.read_text(encoding="utf-8").strip())
-        completed = [x for x in entries if x]
-        body = [f"# {day} 每日工作总结", "", "## 今日完成事项", ""]
-        body.extend(f"{i}. {re.sub(r'^#\s*', '', item.splitlines()[0])[:200]}" for i, item in enumerate(completed, 1))
-        if not completed:
-            body.append("- 暂无导入内容")
-        body += ["", "## 原始记录", ""]
-        body.extend(f"### 记录 {i}\n\n{item}" for i, item in enumerate(completed, 1))
-        body += ["", "## 明天继续关注事项", "", "- 根据今日记录补充后续行动"]
+                source_ids.append(row["id"])
+        summary = self._daily_summary(day, entries, source_ids)
+        body = self._render_daily(summary, entries)
         target = self.s.knowledge_root / "01_Daily" / day[:4] / day[5:7] / f"{day}.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(dump_frontmatter({"date": day, "type": "daily"}, "\n".join(body)), encoding="utf-8")
+        target.with_suffix(".json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         return target
+
+    def _daily_summary(self, day: str, entries: list[str], source_ids: list[str]) -> dict[str, Any]:
+        fallback = {"date": day, "source_ids": source_ids, "completed": [re.sub(r"^#\s*", "", item.splitlines()[0])[:200] for item in entries if item], "problems": [], "knowledge": [], "projects": [], "tomorrow": ["根据今日记录补充后续行动"]}
+        ai = AIClient()
+        if not ai.enabled or not entries:
+            return fallback
+        try:
+            result = self._json_response(ai.ask([{"role": "system", "content": "你是每日总结助手。只输出合法 JSON，字段必须为 date、source_ids、completed、problems、knowledge、projects、tomorrow，所有列表元素使用字符串。"}, {"role": "user", "content": json.dumps({"date": day, "source_ids": source_ids, "records": entries}, ensure_ascii=False)}]))
+            result["date"], result["source_ids"] = day, source_ids
+            return {key: result.get(key, []) if key not in ("date", "source_ids") else result[key] for key in fallback}
+        except (RuntimeError, ValueError, TypeError):
+            return fallback
+
+    @staticmethod
+    def _render_daily(summary: dict[str, Any], entries: list[str]) -> list[str]:
+        body = [f"# {summary['date']} 每日工作总结", "", "## 今日完成事项", ""]
+        body.extend(f"{i}. {value}" for i, value in enumerate(summary.get("completed", []), 1)) or body.append("- 暂无导入内容")
+        for title, key in (("关键问题与解决方案", "problems"), ("知识沉淀", "knowledge"), ("项目进展", "projects"), ("明天继续关注事项", "tomorrow")):
+            body += ["", f"## {title}", ""]
+            values = summary.get(key, []) or ["暂无记录"]
+            body.extend(f"- {value}" for value in values)
+        body += ["", "## 原始记录", ""]
+        body.extend(f"### 记录 {i}\n\n{item}" for i, item in enumerate(entries, 1))
+        return body
 
     def extract(self, day: str | None = None) -> Path:
         day = day or date.today().isoformat()
         daily_path = self.s.knowledge_root / "01_Daily" / day[:4] / day[5:7] / f"{day}.md"
         if not daily_path.exists():
             self.daily(day)
+        json_path = daily_path.with_suffix(".json")
+        summary = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else {}
         _, body = parse_frontmatter(daily_path.read_text(encoding="utf-8"))
         candidates: list[dict[str, Any]] = []
+        ai = AIClient()
+        ai_extracted = False
+        if ai.enabled:
+            try:
+                payload = self._json_response(ai.ask([{"role": "system", "content": "你是长期记忆提取器。只输出 JSON 数组，每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score。只提取稳定且可复用的知识。"}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": body}, ensure_ascii=False)}]))
+                candidates = [self._normalize_candidate(item, day, summary.get("source_ids", [])) for item in payload]
+                ai_extracted = True
+            except (RuntimeError, ValueError, TypeError):
+                candidates = []
+        if ai_extracted:
+            return self._write_candidates(day, candidates)
         for heading, content in re.findall(r"^###\s+(.+?)\n([\s\S]*?)(?=^###\s+|\Z)", body, re.M):
             content = content.strip()
             if not content:
@@ -102,10 +138,29 @@ class MemoryService:
             if title.startswith("记录 "):
                 first = next((line.strip().lstrip("# ") for line in content.splitlines() if line.strip()), title)
                 title = first[:100]
-            candidates.append({"title": title, "category": "General", "subcategory": None, "tags": [], "summary": content[:240], "content": content, "source_date": day, "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}})
+            if not any(item["title"] == title for item in candidates):
+                candidates.append(self._normalize_candidate({"title": title, "category": "General", "tags": [], "summary": content[:240], "content": content, "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}}, day, summary.get("source_ids", [])))
+        return self._write_candidates(day, candidates)
+
+    def _write_candidates(self, day: str, candidates: list[dict[str, Any]]) -> Path:
         target = self.s.knowledge_root / "02_Candidate" / f"{day}-candidates.json"
         target.write_text(json.dumps(candidates, ensure_ascii=False, indent=2), encoding="utf-8")
         return target
+
+    @staticmethod
+    def _json_response(text: str) -> Any:
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.I | re.S)
+        return json.loads(cleaned)
+
+    @staticmethod
+    def _normalize_candidate(item: dict[str, Any], day: str, source_ids: list[str]) -> dict[str, Any]:
+        if not isinstance(item, dict) or not str(item.get("title", "")).strip() or not str(item.get("content", "")).strip():
+            raise ValueError("candidate title/content is required")
+        score = item.get("score") if isinstance(item.get("score"), dict) else {}
+        score = {key: max(0, min(5, int(score.get(key, 0)))) for key in ("reusability", "importance", "uniqueness", "stability", "personal_relevance")}
+        return {"title": str(item["title"]).strip(), "category": str(item.get("category") or "General"), "subcategory": item.get("subcategory"), "tags": [str(x) for x in (item.get("tags") or [])], "summary": str(item.get("summary") or str(item["content"])[:240]), "content": str(item["content"]).strip(), "source_date": day, "source_ids": [str(x) for x in (item.get("source_ids") or source_ids)], "score": score, "total_score": int(item.get("total_score", sum(score.values())))}
 
     def search(self, keyword: str, limit: int = 10):
         like = f"%{keyword}%"
@@ -264,31 +319,94 @@ class MemoryService:
         candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
         outcomes = []
         for candidate in candidates:
-            matches = self.search(candidate["title"], 1)
-            if matches and self._similar(matches[0]["title"], candidate["title"]):
-                row = matches[0]
-                path = self.s.knowledge_root / row["path"]
-                meta, old_body = parse_frontmatter(path.read_text(encoding="utf-8"))
-                merged = old_body.rstrip() + f"\n\n## 更新 {candidate['source_date']}\n\n{candidate['content']}"
-                meta["updated_at"] = candidate["source_date"]
-                path.write_text(dump_frontmatter(meta, merged), encoding="utf-8")
-                self._upsert_meta(meta, row["path"], candidate["source_date"])
-                action, memory_id = "update", row["id"]
-            else:
-                memory_id = f"{slugify(candidate['title'])}-{uuid.uuid4().hex[:8]}"
-                rel = Path("03_Memory") / candidate.get("category", "General") / f"{memory_id}.md"
-                target = self.s.knowledge_root / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                now = candidate["source_date"]
-                meta = {"id": memory_id, "title": candidate["title"], "category": candidate.get("category", "General"), "subcategory": candidate.get("subcategory") or "", "tags": candidate.get("tags", []), "summary": candidate.get("summary", ""), "status": "active", "memory_level": "long_term", "score": sum(candidate.get("score", {}).values()), "created_at": now, "updated_at": now, "source_dates": [now]}
-                target.write_text(dump_frontmatter(meta, f"# {candidate['title']}\n\n{candidate['content']}"), encoding="utf-8")
-                self._upsert_meta(meta, rel.as_posix(), now)
-                action = "create"
-            self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, "local heuristic decision", json.dumps(candidate, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
+            decision = self._judge_candidate(candidate)
+            action = decision.action
+            memory_id = decision.target_memory_id
+            if action == "create":
+                memory_id = self._create_memory(candidate)
+            elif action in {"update", "merge"}:
+                if not memory_id or not self.conn.execute("SELECT 1 FROM memories WHERE id = ?", (memory_id,)).fetchone():
+                    action, memory_id = "candidate", None
+                else:
+                    self._update_memory(memory_id, candidate, decision, merge=(action == "merge"))
+            elif action == "conflict":
+                self._save_special_candidate(candidate, "conflicts")
+            elif action == "candidate":
+                self._save_special_candidate(candidate, "pending")
+            elif action == "discard":
+                pass
+            audit_payload = {"candidate": candidate, "decision": {"action": decision.action, "target_memory_id": decision.target_memory_id, "confidence": decision.confidence, "total_score": decision.total_score, "changes": decision.changes, "merge_memory_ids": decision.merge_memory_ids}}
+            self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, decision.reason, json.dumps(audit_payload, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
+            if memory_id and candidate.get("source_ids"):
+                for source_id in candidate["source_ids"]:
+                    self.conn.execute("INSERT INTO memory_sources(memory_id, source_date, source_type, source_path, created_at) SELECT ?, source_date, source_type, path, ? FROM sources WHERE id = ?", (memory_id, datetime.now().isoformat(timespec="seconds"), source_id))
             self.conn.commit()
             outcomes.append(f"{action}: {candidate['title']}")
         self.rebuild_index()
         return outcomes
+
+    def _judge_candidate(self, candidate: dict[str, Any]) -> MemoryDecision:
+        existing = self.retrieve_context(candidate["title"], limit=5)
+        ai = AIClient()
+        if ai.enabled:
+            try:
+                payload = self._json_response(ai.ask([{"role": "system", "content": "你是 Memory Judge。只输出合法 JSON。action 必须是 create/update/merge/candidate/discard/conflict。AI 只能给决策，不能写文件。"}, {"role": "user", "content": json.dumps({"candidate": candidate, "existing": [{"id": m["id"], "title": m["title"], "category": m["category"], "content": m["content"]} for m in existing]}, ensure_ascii=False)}]))
+                decision = MemoryDecision.from_dict(payload)
+                if decision.action in {"update", "merge"} and not decision.target_memory_id:
+                    raise ValueError("update/merge requires target_memory_id")
+                return decision
+            except (RuntimeError, ValueError, TypeError, json.JSONDecodeError):
+                pass
+        if existing and self._similar(existing[0]["title"], candidate["title"]):
+            return MemoryDecision("update", "发现相似长期记忆，追加候选内容", existing[0]["id"], 0.65, candidate.get("total_score", 0))
+        if candidate.get("total_score", sum(candidate.get("score", {}).values())) < 12:
+            return MemoryDecision("candidate", "候选记忆评分不足，保留待确认", None, 0.7, candidate.get("total_score", 0))
+        return MemoryDecision("create", "未发现相似记忆且候选具有复用价值", None, 0.65, candidate.get("total_score", 0))
+
+    def _create_memory(self, candidate: dict[str, Any]) -> str:
+        memory_id = f"{slugify(candidate['title'])}-{uuid.uuid4().hex[:8]}"
+        rel = Path("03_Memory") / candidate.get("category", "General") / f"{memory_id}.md"
+        target = self.s.knowledge_root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        now = candidate["source_date"]
+        meta = {"id": memory_id, "title": candidate["title"], "category": candidate.get("category", "General"), "subcategory": candidate.get("subcategory") or "", "tags": candidate.get("tags", []), "summary": candidate.get("summary", ""), "status": "active", "memory_level": "long_term", "score": candidate.get("total_score", sum(candidate.get("score", {}).values())), "created_at": now, "updated_at": now, "source_dates": [now]}
+        target.write_text(dump_frontmatter(meta, f"# {candidate['title']}\n\n{candidate['content']}"), encoding="utf-8")
+        self._upsert_meta(meta, rel.as_posix(), now)
+        return memory_id
+
+    def _update_memory(self, memory_id: str, candidate: dict[str, Any], decision: MemoryDecision, merge: bool = False) -> None:
+        row = self.conn.execute("SELECT path FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        path = self.s.knowledge_root / row["path"]
+        self._archive_version(memory_id, path)
+        meta, old_body = parse_frontmatter(path.read_text(encoding="utf-8"))
+        changes = decision.changes
+        new_content = str(changes.get("content") or candidate["content"]).strip()
+        if changes.get("summary"):
+            meta["summary"] = str(changes["summary"])
+        if changes.get("tags_to_add"):
+            meta["tags"] = list(dict.fromkeys((meta.get("tags") or []) + [str(x) for x in changes["tags_to_add"]]))
+        meta["updated_at"] = candidate["source_date"]
+        source_dates = meta.get("source_dates") or []
+        meta["source_dates"] = list(dict.fromkeys(source_dates + [candidate["source_date"]]))
+        path.write_text(dump_frontmatter(meta, old_body.rstrip() + f"\n\n## 更新 {candidate['source_date']}\n\n{new_content}"), encoding="utf-8")
+        self._upsert_meta(meta, row["path"], candidate["source_date"])
+        for merged_id in decision.merge_memory_ids:
+            if merged_id != memory_id:
+                self.conn.execute("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", (candidate["source_date"], merged_id))
+                self.conn.execute("INSERT OR IGNORE INTO memory_relations(source_memory_id,target_memory_id,relation_type,created_at) VALUES(?,?,?,?)", (memory_id, merged_id, "merged_from", datetime.now().isoformat(timespec="seconds")))
+
+    def _archive_version(self, memory_id: str, path: Path) -> Path:
+        archive_dir = self.s.knowledge_root / "06_Archive" / "versions" / memory_id
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        versions = sorted(archive_dir.glob("v*.md"))
+        target = archive_dir / f"v{len(versions) + 1}-{datetime.now().strftime('%Y%m%d%H%M%S')}.md"
+        target.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        return target
+
+    def _save_special_candidate(self, candidate: dict[str, Any], kind: str) -> Path:
+        target = self.s.knowledge_root / "02_Candidate" / f"{kind}-{candidate['source_date']}-{slugify(candidate['title'])}.json"
+        target.write_text(json.dumps(candidate, ensure_ascii=False, indent=2), encoding="utf-8")
+        return target
 
     @staticmethod
     def _similar(a: str, b: str) -> bool:

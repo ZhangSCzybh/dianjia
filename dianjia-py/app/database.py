@@ -39,6 +39,15 @@ def connect(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    migrations = {
+        "sources": [("title", "TEXT"), ("metadata", "TEXT")],
+    }
+    for table, columns in migrations.items():
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns:
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+    conn.commit()
     return conn
 
 
