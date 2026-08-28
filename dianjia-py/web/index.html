@@ -23,17 +23,110 @@
     @media (max-width:900px) { .shell { grid-template-columns:72px minmax(0,1fr); } .sidebar { padding:20px 10px; } .brand { padding:0 10px 28px; } .brand-copy,.nav-label,.nav a span:not(.nav-icon),.side-footer { display:none; } .nav a { justify-content:center; } .topbar,main { padding-left:24px; padding-right:24px; } .workspace { grid-template-columns:1fr; } }
     @media (max-width:600px) { .shell { display:block; } .sidebar { position:static; height:auto; padding:12px 16px; flex-direction:row; align-items:center; } .brand { padding:0; } .nav-label,.side-footer { display:none; } .nav { margin-left:auto; display:flex; } .nav a { padding:8px; } .nav a span:not(.nav-icon) { display:none; } .topbar { height:auto; padding:17px 18px; } .connection { display:none; } main { padding:22px 14px 36px; } .intro { display:block; } .intro h2 { font-size:24px; } .hint { margin-top:14px; max-width:none; } .stats { gap:8px; } .stat { min-height:92px; padding:13px; } .stat strong { font-size:23px; } .stat-icon { width:24px; height:24px; font-size:13px; } .workspace { gap:14px; } .panel + .panel { margin-top:14px; } .panel-header,.panel-body { padding-left:15px; padding-right:15px; } .form-row,.process-row,.ask-row,.search-row { grid-template-columns:1fr; } .form-row .btn,.process-row .btn,.ask-row .btn,.search-row .btn { width:100%; } textarea { min-height:150px; } }
   </style>
+  <style>
+    :root { --ink:#202b27; --muted:#6e7974; --subtle:#a8b0aa; --line:#deded6; --panel:#fffdf8; --canvas:#eeeee8; --nav:#202b28; --nav-soft:#2e3b36; --teal:#75c6b1; --teal-dark:#267a68; --teal-pale:#e1f3ed; --amber:#efc96f; --amber-pale:#fff8e7; --coral:#db826e; --shadow:0 16px 38px rgba(32,43,40,.08); }
+    body { color:var(--ink); background:var(--canvas); }
+    .shell { grid-template-columns:226px minmax(0,1fr); }
+    .sidebar { padding:26px 15px 18px; color:#cad8d1; background:var(--nav); }
+    .brand { padding:0 10px 34px; }
+    .brand-mark { width:34px; height:34px; color:#1f3b32; background:var(--amber); border-radius:10px; }
+    .brand-name { color:#f4f7f2; font-weight:750; }
+    .brand-sub { color:#7f968b; }
+    .nav-label { color:#789087; font-weight:700; }
+    .nav a { color:#a9bbb2; }
+    .nav a:hover,.nav a.active { color:#fff; background:var(--nav-soft); }
+    .nav-icon { color:var(--teal); }
+    .side-footer { border-top-color:#35433e; color:#81968d; }
+    .side-footer strong { color:#dbe7df; }
+    .topbar { min-height:72px; height:auto; padding:0 38px; border-bottom-color:var(--line); background:rgba(255,253,248,.82); }
+    .eyebrow { color:var(--teal-dark); font-size:10px; font-weight:800; letter-spacing:.15em; }
+    .topbar h1 { font-size:21px; }
+    .connection { color:var(--muted); }
+    .dot { background:#49aa7c; box-shadow:0 0 0 4px #dcefe4; }
+    main { padding:29px 38px 52px; }
+    .intro { margin-bottom:22px; }
+    .intro h2 { max-width:600px; margin:5px 0 7px; font-size:29px; line-height:1.14; letter-spacing:-.045em; }
+    .intro p { color:var(--muted); }
+    .hint { padding:10px 13px; border-left:3px solid var(--amber); color:#7b6432; background:var(--amber-pale); }
+    .stats { gap:11px; margin-bottom:17px; }
+    .stat { min-height:82px; padding:14px 17px; border-color:var(--line); border-radius:0; background:var(--panel); box-shadow:var(--shadow); }
+    .stat-head { color:var(--muted); font-size:11px; }
+    .stat-icon { width:29px; height:29px; border-radius:8px; color:var(--teal-dark); background:var(--teal-pale); }
+    .stat:nth-child(2) .stat-icon { color:#9a7021; background:#fff3d8; }
+    .stat:nth-child(3) .stat-icon { color:#a34e42; background:#fae5df; }
+    .stat strong { font-size:26px; }
+    .workspace { grid-template-columns:minmax(0,.88fr) minmax(410px,1.12fr); gap:16px; }
+    .workspace > div { display:contents; }
+    .workspace > div:first-child > #import { grid-column:1; grid-row:1; }
+    .workspace > div:first-child > #search { grid-column:2; grid-row:2; }
+    .workspace > div:last-child > #process { grid-column:2; grid-row:1; }
+    .workspace > div:last-child > #ask { grid-column:1 / -1; grid-row:3; }
+    .panel { border-color:var(--line); border-radius:0; background:var(--panel); box-shadow:var(--shadow); }
+    .panel + .panel { margin-top:16px; }
+    .panel-header { padding:17px 19px 13px; border-bottom-color:#ecece5; }
+    .panel-title { gap:10px; }
+    .panel-title h3 { font-size:15px; }
+    .panel-title p { color:var(--muted); font-size:11px; }
+    .panel-symbol { width:28px; height:28px; border-radius:8px; color:var(--teal-dark); background:var(--teal-pale); }
+    .panel-body { padding:17px 19px 19px; }
+    .field-label { color:var(--muted); font-size:11px; font-weight:700; }
+    textarea,input { border-color:#d5d9d1; border-radius:6px; color:var(--ink); background:#fff; }
+    textarea { min-height:137px; }
+    textarea:focus,input:focus { border-color:#73b9a6; box-shadow:0 0 0 3px #e0f1eb; }
+    .form-row { grid-template-columns:minmax(0,1fr) 132px auto; gap:7px; margin-top:9px; }
+    .process-row { grid-template-columns:minmax(0,1fr) auto auto; gap:8px; }
+    .actions { gap:7px; margin-top:10px; }
+    .btn { min-height:40px; padding:8px 13px; border-color:var(--teal-dark); border-radius:6px; color:#fff; background:var(--teal-dark); font-weight:700; }
+    .btn:hover { background:#1c6758; }
+    .btn.secondary { border-color:#cfd8d2; color:var(--teal-dark); background:#fff; }
+    .btn.secondary:hover { background:#eff8f4; }
+    .btn.amber { border-color:#e0bd60; color:#6f551b; background:var(--amber-pale); }
+    .btn.amber:hover { background:#fff0c8; }
+    .notice { color:var(--teal-dark); font-size:11px; }
+    .ask-panel { color:var(--ink); border-color:#cde2df; background:var(--panel); }
+    .ask-panel .panel-header { border-bottom-color:#ecece5; background:#f5fbfa; }
+    .ask-panel .panel-symbol { color:var(--teal-dark); background:var(--teal-pale); }
+    .ask-panel .panel-title h3 { color:var(--ink); }
+    .ask-panel .panel-title p { color:var(--muted); }
+    .ask-panel .panel-body { padding-top:15px; }
+    .ask-row { gap:8px; }
+    .ask-row input { border-color:#d5d9d1; color:var(--ink); background:#fff; }
+    .ask-row input::placeholder { color:var(--subtle); }
+    .ask-panel .btn { color:#fff; border-color:var(--teal-dark); background:var(--teal-dark); }
+    .ask-panel .btn:hover { background:#1c6758; }
+    #answer { max-height:600px; overflow-y:auto; padding-right:4px; }
+    .ask-panel .answer-box { max-height:440px; overflow-y:auto; padding:16px 17px; border-color:#dfebe9; border-radius:0; color:var(--ink); background:#fbfefd; scrollbar-color:#9bc6b6 #fbfefd; scrollbar-width:thin; }
+    .ask-panel .answer-placeholder { min-height:150px; display:flex; align-items:flex-start; color:var(--subtle); background:#fbfefd; }
+    .ask-panel .answer-box::-webkit-scrollbar { width:6px; }
+    .ask-panel .answer-box::-webkit-scrollbar-track { background:#fbfefd; }
+    .ask-panel .answer-box::-webkit-scrollbar-thumb { border-radius:6px; background:#9bc6b6; }
+    .ask-panel .result-heading { color:var(--muted); }
+    .ask-panel .memory { border-top-color:var(--line); }
+    .ask-panel .memory-title { color:var(--ink); }
+    .ask-panel .memory-path { color:var(--muted); }
+    .search-row input { min-height:40px; }
+    .search-placeholder { min-height:120px; padding:14px 15px; border:1px dashed var(--line); color:var(--subtle); background:#fbfcfa; }
+    .memory { padding:10px 0; }
+    .memory-title { font-weight:700; }
+    @media (min-width:901px) {
+      .workspace > div:first-child > #import { grid-row:1 / span 2; display:flex; flex-direction:column; min-height:600px; }
+      .workspace > div:first-child > #import .panel-body { display:flex; flex:1; flex-direction:column; }
+      .workspace > div:first-child > #import textarea { flex:1; min-height:400px; }
+    }
+    @media (max-width:900px) { .shell { grid-template-columns:68px minmax(0,1fr); } .sidebar { padding:20px 9px; } .brand { padding:0 8px 28px; } .topbar,main { padding-left:24px; padding-right:24px; } .workspace { grid-template-columns:1fr; } .workspace > div { display:block; } .workspace > div:first-child > #import,.workspace > div:first-child > #search,.workspace > div:last-child > #process,.workspace > div:last-child > #ask { grid-column:auto; grid-row:auto; } }
+    @media (max-width:600px) { .sidebar { height:auto; padding:11px 15px; } .topbar { min-height:66px; padding:15px 17px; } main { padding:21px 14px 34px; } .intro h2 { font-size:25px; } .hint { margin-top:13px; } .stat { min-height:75px; padding:11px; } .stat strong { font-size:22px; } .panel-header,.panel-body { padding-left:14px; padding-right:14px; } }
+  </style>
 </head>
 <body>
   <div class="shell">
     <aside class="sidebar"><div class="brand"><div class="brand-mark">D</div><div class="brand-copy"><div class="brand-name">Dianjia Memory</div><div class="brand-sub">个人知识工作台</div></div></div><div class="nav-label">Workspace</div><nav class="nav" aria-label="主导航"><a class="active" href="#overview"><span class="nav-icon">⌂</span><span>工作台</span></a><a href="#import"><span class="nav-icon">＋</span><span>导入记录</span></a><a href="#ask"><span class="nav-icon">⌕</span><span>知识问答</span></a><a href="#search"><span class="nav-icon">≡</span><span>记忆搜索</span></a></nav><div class="side-footer"><strong>本地运行</strong>数据只保存在当前知识库与 SQLite 索引中</div></aside>
     <div class="content"><header class="topbar"><div><div class="eyebrow">Knowledge workspace</div><h1>知识工作台</h1></div><div class="connection"><span class="dot"></span>本地服务已连接</div></header><main>
-      <section class="intro" id="overview"><div><div class="eyebrow">Overview</div><h2>把今天的对话，沉淀成可检索的记忆</h2><p>导入原始记录，运行每日处理，再用自然语言找回过去的解决方案。</p></div><div class="hint">建议顺序：导入对话 → 一键处理 → 知识库问答</div></section>
+      <section class="intro" id="overview"><div><div class="eyebrow">Overview</div><h2>让每一次解决问题，沉淀成可检索的记忆</h2><p>把原始记录整理成有上下文、可追溯的长期记忆。</p></div><div class="hint">今日工作台 · 2026 / 08 / 28</div></section>
       <section class="stats" aria-label="系统状态"><div class="stat"><div class="stat-head"><span>原始记录</span><span class="stat-icon">↳</span></div><strong id="sources">-</strong></div><div class="stat"><div class="stat-head"><span>长期记忆</span><span class="stat-icon">✦</span></div><strong id="memories">-</strong></div><div class="stat"><div class="stat-head"><span>处理记录</span><span class="stat-icon">✓</span></div><strong id="actions">-</strong></div></section>
       <div class="workspace"><div><section class="panel" id="import"><div class="panel-header"><div class="panel-title"><span class="panel-symbol">＋</span><div><h3>导入对话</h3><p>将聊天记录或工作笔记保存为原始 Source</p></div></div></div><div class="panel-body"><label class="field-label" for="input">记录内容</label><textarea id="input" placeholder="粘贴今天的聊天记录或工作记录"></textarea><div class="form-row"><input id="inputName" value="web-conversation" aria-label="记录名称" placeholder="记录名称"><input id="inputDate" type="date" aria-label="记录日期"><button class="btn" onclick="ingest()">导入记录</button></div><div id="ingestNotice" class="notice"></div></div></section>
-      <section class="panel" id="search"><div class="panel-header"><div class="panel-title"><span class="panel-symbol">⌕</span><div><h3>记忆搜索</h3><p>按标题、标签、分类或摘要查找长期记忆</p></div></div></div><div class="panel-body"><div class="search-row"><input id="query" placeholder="例如：库存唯一键、会员归类、DRP"><button class="btn secondary" onclick="search()">搜索</button></div><div id="results"></div></div></section></div>
+      <section class="panel" id="search"><div class="panel-header"><div class="panel-title"><span class="panel-symbol">⌕</span><div><h3>记忆搜索</h3><p>按标题、标签、分类或摘要查找长期记忆</p></div></div></div><div class="panel-body"><div class="search-row"><input id="query" placeholder="例如：库存唯一键、会员归类、DRP"><button class="btn secondary" onclick="search()">搜索</button></div><div id="results"><div class="search-placeholder">等待搜索，匹配的长期记忆会显示在这里。</div></div></div></section></div>
       <div><section class="panel" id="process"><div class="panel-header"><div class="panel-title"><span class="panel-symbol">◷</span><div><h3>每日处理</h3><p>从日报到长期记忆的完整流水线</p></div></div></div><div class="panel-body"><label class="field-label" for="runDate">处理日期（留空为今天）</label><div class="process-row"><input id="runDate" type="date" aria-label="处理日期"><button class="btn secondary" onclick="daily()">生成日报</button><button class="btn" onclick="run('/api/run-daily','每日流程已完成')">一键处理</button></div><div class="actions"><button class="btn secondary" onclick="run('/api/extract','候选记忆已提取')">提取候选</button><button class="btn secondary" onclick="run('/api/process','候选记忆已处理')">处理记忆</button><button class="btn amber" onclick="run('/api/rebuild-index','索引已重建')">重建索引</button><button class="btn secondary" onclick="refreshStatus()">刷新状态</button></div><div id="pipelineNotice" class="notice"></div><div id="status" class="notice"></div></div></section>
-      <section class="panel ask-panel" id="ask"><div class="panel-header"><div class="panel-title"><span class="panel-symbol">✦</span><div><h3>知识库问答</h3><p>先检索最高相关的 Top 5，再交给 AI 组织答案</p></div></div></div><div class="panel-body"><div class="ask-row"><input id="question" placeholder="输入问题，例如：我之前如何处理库存唯一键？"><button class="btn" onclick="ask()">检索并回答</button></div><div id="answer"></div></div></section></div></div>
+      <section class="panel ask-panel" id="ask"><div class="panel-header"><div class="panel-title"><span class="panel-symbol">✦</span><div><h3>知识库问答</h3><p>先检索最高相关的 Top 5，再交给 AI 组织答案</p></div></div></div><div class="panel-body"><div class="ask-row"><input id="question" placeholder="输入问题，例如：我之前如何处理库存唯一键？"><button class="btn" onclick="ask()">检索并回答</button></div><div id="answer"><div class="answer-box answer-placeholder">等待提问，答案会显示在这里。</div></div></div></section></div></div>
     </main></div>
   </div>
   <script>

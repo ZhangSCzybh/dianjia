@@ -245,8 +245,25 @@ class MemoryService:
         return {"title": title, "category": category, "subcategory": subcategory, "tags": [str(x) for x in (item.get("tags") or [])], "summary": str(item.get("summary") or content[:240]), "content": content, "source_date": day, "source_ids": [str(x) for x in (item.get("source_ids") or source_ids)], "score": score, "total_score": int(item.get("total_score", sum(score.values())))}
 
     def search(self, keyword: str, limit: int = 10):
-        like = f"%{keyword}%"
-        return self.conn.execute("SELECT * FROM memories WHERE status = 'active' AND (title LIKE ? OR tags LIKE ? OR category LIKE ? OR summary LIKE ?) ORDER BY updated_at DESC LIMIT ?", (like, like, like, like, limit)).fetchall()
+        """Search active memory metadata and Markdown bodies.
+
+        Full metric-index memories keep technical codes and explanations in the
+        body, so metadata-only SQL search would make those rows undiscoverable.
+        """
+        needle = str(keyword or "").strip().lower()
+        if not needle:
+            return []
+        rows = self.conn.execute("SELECT * FROM memories WHERE status = 'active' ORDER BY updated_at DESC, title").fetchall()
+        matches = []
+        for row in rows:
+            path = self.s.knowledge_root / row["path"]
+            body = path.read_text(encoding="utf-8", errors="replace").lower() if path.exists() else ""
+            fields = " ".join(str(row[key] or "") for key in ("title", "tags", "category", "summary"))
+            if needle in fields.lower() or needle in body:
+                matches.append(row)
+                if len(matches) >= max(1, int(limit)):
+                    break
+        return matches
 
     def retrieve_context(self, query: str, limit: int = 5, max_chars: int = 12000) -> list[dict[str, Any]]:
         """Retrieve at most five ranked memory excerpts for a RAG prompt.
