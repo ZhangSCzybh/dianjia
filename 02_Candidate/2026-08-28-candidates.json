@@ -1,28 +1,98 @@
 [
   {
-    "title": "ClickHouse 查询技能与只读查询规范",
-    "category": "SQL",
-    "subcategory": "查询与数据",
-    "tags": [
-      "clickhouse",
-      "sql",
-      "select",
-      "数据库",
-      "字段"
-    ],
-    "summary": "创建 ClickHouse 查询技能 [$skill-creator](~/.codex/skills/.system/skill-creator/SKILL.md) .env文件中有2个clickhouse数据库集群，连接地址和账号密码也有，帮我生成一个skills，之后我可以直接查询数据库。并且告诉我操作说明",
-    "content": "# 创建 ClickHouse 查询技能\n[$skill-creator](~/.codex/skills/.system/skill-creator/SKILL.md) .env文件中有2个clickhouse数据库集群，连接地址和账号密码也有，帮我生成一个skills，之后我可以直接查询数据库。并且告诉我操作说明\n\n16 previous messages\n我会使用 `skill-creator` 来生成一个可复用的 ClickHouse 查询技能：先读取技能规范和项目 `.env` 的变量名，确认两个集群的连接配置；然后创建技能文件与查询辅助脚本，验证格式，并给你清晰的调用说明。敏感密码不会写入技能内容或最终回复。\n\nExplored a file\n- Read `~/.codex/skills/.system/skill-creator/SKILL.md`\n\n- Ran `ls -la && printf '\\n.env variable names:\\n' && sed -E 's/=.*//' .env 2>/dev/null || true`\n- Ran `pwd && printf 'CODEX_HOME=%s\\n' \"${CODEX_HOME-}\" && rg --files -g '.env' -g '!node_modules' -g '!vendor' | head -20 && rg --files -g 'SKILL.md' /Users/zhangshichao/.codex/skills/.system/skill-creator 2>/dev/null`\n\n`.env` 里确实有两个集群标识和连接地址，但格式看起来不是标准 `KEY=VALUE`，还需要确认账号密码的实际键名及项目是否已有 ClickHouse 依赖。接下来我会只读取键名、依赖和现有脚本结构，避免把凭据打印出来。\nExplored a file, 2 searches, 2 lists, ran 4 commands\n- Ran `printf 'Skill locations:\\n'; ls -la /Users/zhangshichao/.codex/skills 2>/dev/null | head -60; printf '\\nInitializer files:\\n'; find /Users/zhangshichao/.codex/skills/.system/skill-creator -maxdepth 2 -type f -print | sort`\nExplored a file, 2 searches, 2 lists\n- Read `./.env`\n- Listed files in `dianjia-py`\n- Listed files in `dianjia-py`\n- Searched for `(^|/)(requirements[^/]*|pyproject.toml|Pipfile|package.json|.*clickhouse.*)$`\n- Searched for `clickhouse|flowdata-ka|flowdata-normal` in `dianjia-py`\n\n- Ran `printf '%s\\n' 'Project .env (secrets masked):'; awk 'BEGIN{FS=\"=\"} {line=$0; if (tolower($0) ~ /password|passwd|pwd|secret|token/) {sub(/=.*/,\"=\",line)} print line}' dianjia-py/.env 2>/dev/null || true; printf '\\nrequirements:\\n'; sed -n '1,160p' dianjia-py/requirements.txt; printf '\\npyproject:\\n'; sed -n '1,180p' dianjia-py/pyproject.toml`\n- Ran `command -v clickhouse-client || true; command -v curl || true; python3 -  mods=['clickhouse_connect','clickhouse_driver','requests']\nfor m in mods:\n try:\n  __import__(m); print(m, 'available')\n except Exception as e: print(m, 'missing')\nPY`\n- Ran `sed -n '1,240p' /Users/zhangshichao/.codex/skills/.system/skill-creator/references/openai_yaml.md && printf '\\n--- init help ---\\n' && python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/init_skill.py --help`\n\n我确认项目没有 ClickHouse Python 客户端，且两个地址是 ClickHouse HTTP 端口 `8123`。我会把技能设计为零额外依赖的 Python HTTP 查询器：从项目 `.env` 读取两个集群和共享凭据，默认只允许只读 SQL，并支持表格/JSON/CSV 输出；技能本身不保存密码。现在开始初始化到 Codex 的个人 skills 目录。\nExplored a file, ran a command\n- Ran `python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/init_skill.py clickhouse-query --path /Users/zhangshichao/.codex/skills --resources scripts,references --interface display_name='ClickHouse Query' --interface short_description='Query the two project ClickHouse clusters' --interface default_prompt='Use $clickhouse-query to run a read-only query against one of the project ClickHouse clusters.'`\nExplored 2 files\n- Read `~/.codex/skills/clickhouse-query/SKILL.md`\n- Read `~/.codex/skills/clickhouse-query/agents/openai.yaml`\n\n技能结构已创建。接下来我会补齐三部分：入口说明（如何选择集群、生成和执行只读 SQL）、无依赖查询脚本（解析当前 `.env` 的实际格式并安全发送 HTTP 请求）、以及一页配置参考。脚本会拒绝多语句和明显写操作，连接失败时给出不泄露凭据的错误信息。\nCreated 2 files, edited a file, explored a file, ran 3 commands\n- Wrote `~/.codex/skills/clickhouse-query/SKILL.md` (+27 -3)\n- Wrote `~/.codex/skills/clickhouse-query/references/configuration.md` (+22 -0)\n- Wrote `~/.codex/skills/clickhouse-query/scripts/query_clickhouse.py` (+136 -0)\nExplored 2 files\n- Read `~/.codex/skills/clickhouse-query/scripts/query_clickhouse.py`\n- Read `~/.codex/skills/clickhouse-query/SKILL.md`\n\n- Ran `python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/quick_validate.py /Users/zhangshichao/.codex/skills/clickhouse-query`\n- Ran `ls -l /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py /Users/zhangshichao/.codex/skills/clickhouse-query/SKILL.md; git -C /Users/zhangshichao/Documents/Workspace/dianjia status --short`\n- Ran `python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --list-clusters`\n\n技能内容已写好，配置解析和集群枚举测试通过。当前环境有两个验证限制：个人 skills 目录不可写入执行权限（因此会通过 `python3 script.py` 调用），并且验证器依赖的 `PyYAML` 未安装；我会继续用不写入该目录的方式完成语法和行为测试，并检查是否存在凭据泄露。\nExplored 2 searches, a list, ran 4 commands\nExplored a search, a list\n- Searched for `(password|secret|token|api[_-]?key)\\s*[:=]\\s*[^ - Listed files in `clickhouse-query`\n\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile -d /private/tmp /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py && printf 'compile=ok\\n'`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'DROP TABLE x' >/private/tmp/clickhouse-query-test.out 2>/private/tmp/clickhouse-query-test.err; rc=$?; printf 'mutation_rc=%s\\n' \"$rc\"; sed -n '1,3p' /private/tmp/clickhouse-query-test.err`\nExplored a search\n- Searched for `(sk-[a-z0-9]|clickhouse.*password\\s*=\\s*[^\n\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -c 'from pathlib import Path; compile(Path(\"/Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py\").read_text(), \"query_clickhouse.py\", \"exec\"); print(\"compile=ok\")'`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -  import importlib.util\nfrom pathlib import Path\np=Path('/Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py')\nspec=importlib.util.spec_from_file_location('query_clickhouse', p)\nm=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\nclusters,user,password=[REDACTED_SECRET]'/Users/zhangshichao/Documents/Workspace/dianjia/.env'))\nassert set(clusters)=={'flowdata-ka','flowdata-normal'}\nassert user == 'data_read' and password\nfor sql in ['SELECT 1', 'SHOW DATABASES', 'DESCRIBE TABLE system.tables', 'SELECT 1;']:\n    assert m.check_sql(sql)\nfor sql in ['DROP TABLE x', 'INSERT INTO x VALUES (1)', 'SELECT 1; SELECT 2']:\n    try: m.check_sql(sql)\n    except ValueError: pass\n    else: raise AssertionError(sql)\nprint('parser_and_sql_guards=ok')\nPY`\n\n行为测试发现一个真实边界问题：`DESCRIBE TABLE system.tables` 会因为表名包含 `system` 被误判为写操作。我会收紧判断逻辑为“只允许已知只读起始关键字 + 禁止多语句”，避免扫描 SQL 正文造成误报；写操作本身都以其关键字开头，因此仍会被拒绝。\nEdited a file, explored a file, ran 6 commands\n- Wrote `~/.codex/skills/clickhouse-query/scripts/query_clickhouse.py` (+0 -6)\n- Ran `python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/quick_validate.py /Users/zhangshichao/.codex/skills/clickhouse-query`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -  import importlib.util\nfrom pathlib import Path\np=Path('/Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py')\nspec=importlib.util.spec_from_file_location('query_clickhouse', p)\nm=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\nclusters,user,password=[REDACTED_SECRET]'/Users/zhangshichao/Documents/Workspace/dianjia/.env'))\nassert set(clusters)=={'flowdata-ka','flowdata-normal'}\nassert user == 'data_read' and password\nfor sql in ['SELECT 1', 'SHOW DATABASES', 'DESCRIBE TABLE system.tables', 'SELECT 1;']:\n    assert m.check_sql(sql)\nfor sql in ['DROP TABLE x', 'INSERT INTO x VALUES (1)', 'SELECT 1; SELECT 2']:\n    try: m.check_sql(sql)\n    except ValueError: pass\n    else: raise AssertionError(sql)\nprint('parser_and_sql_guards=ok')\nPY`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -  import importlib.util, sys\nfrom pathlib import Path\np=Path('/Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py')\nspec=importlib.util.spec_from_file_location('query_clickhouse', p)\nm=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\nseen={}\nclass Resp:\n    def __enter__(self): return self\n    def __exit__(self,*a): pass\n    def read(self): return b'{\"ok\":1}\\n'\ndef fake_open(req, timeout):\n    seen['url']=req.full_url; seen['body']=req.data.decode(); seen['auth']=req.headers['Authorization']; seen['timeout']=timeout\n    return Resp()\nm.urlopen=fake_open\nsys.argv=['query_clickhouse.py','--cluster','flowdata-ka','--sql','SELECT 1']\nassert m.main()==0\nassert seen['url'].startswith('http://dianplus.clickhouseserver')\nassert seen['body']=='SELECT 1\\nFORMAT JSONEachRow'\nassert seen['auth'].startswith('Basic ')\nprint('request_building=ok')\nPY`\nExplored a file\n- Read `~/.codex/skills/.system/skill-creator/scripts/quick_validate.py`\n\n- Ran `git -C /Users/zhangshichao/Documents/Workspace/dianjia status --short; rg -n '\\[TODO||||sk-' /Users/zhangshichao/.codex/skills/clickhouse-query || true`\n- Ran `find /Users/zhangshichao/.codex /Users/zhangshichao/Documents/Workspace -type d -name 'yaml' -o -name 'yaml-*' 2>/dev/null | head -20; command -v ruby || true; ruby -e 'require \"yaml\"; puts YAML.load_file(\"/Users/zhangshichao/.codex/skills/clickhouse-query/agents/openai.yaml\").inspect' 2>&1`\n- Ran `PYTHONPATH=/Users/zhangshichao/Documents/Workspace/aitest-skills/skills-专业版/.venv/lib/python3.12/site-packages python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/quick_validate.py /Users/zhangshichao/.codex/skills/clickhouse-query`\n\n脚本语法、配置解析、只读拦截和请求构造测试均已通过；使用 `PyYAML` 的技能结构验证也已通过。最后我会用最小的 `SELECT 1` 做一次连接可用性检查（不会输出凭据），然后给你安装位置和日常调用示例。\n\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SELECT 1 AS ok' --timeout 5`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-ka --sql 'SELECT 1 AS ok' --timeout 5`\n\n连通性检查在当前沙箱中因 DNS 无法解析阿里云主机名而失败，未能证明远端可达；技能本身不依赖该沙箱网络。另做一项安全加固：限制 `--format` 为单一 ClickHouse 格式名，防止把额外 SQL 拼进请求体。\nEdited a file, ran 4 commands\n- Wrote `~/.codex/skills/clickhouse-query/scripts/query_clickhouse.py` (+5 -1)\n- Ran `find /Users/zhangshichao/.codex/skills/clickhouse-query -type f -maxdepth 3 -print | sort; printf '\\nGenerated skill status:\\n'; git -C /Users/zhangshichao/Documents/Workspace/dianjia status --short`\n- Ran `PYTHONPATH=/Users/zhangshichao/Documents/Workspace/aitest-skills/skills-专业版/.venv/lib/python3.12/site-packages python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/quick_validate.py /Users/zhangshichao/.codex/skills/clickhouse-query`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -  import importlib.util, sys\nfrom pathlib import Path\np=Path('/Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py')\nspec=importlib.util.spec_from_file_location('query_clickhouse', p)\nm=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\nclusters,user,password=[REDACTED_SECRET]'/Users/zhangshichao/Documents/Workspace/dianjia/.env'))\nassert set(clusters)=={'flowdata-ka','flowdata-normal'} and user == 'data_read' and password\nfor sql in ['SELECT 1', 'SHOW DATABASES', 'DESCRIBE TABLE system.tables', 'SELECT 1;']:\n    m.check_sql(sql)\nfor sql in ['DROP TABLE x', 'INSERT INTO x VALUES (1)', 'SELECT 1; SELECT 2']:\n    try: m.check_sql(sql)\n    except ValueError: pass\n    else: raise AssertionError(sql)\nprint('parser_and_sql_guards=ok')\nPY`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SELECT 1' --format 'JSONEachRow;DROP' >/private/tmp/cq.out 2>/private/tmp/cq.err; rc=$?; printf 'format_guard_rc=%s\\n' \"$rc\"; sed -n '1,2p' /private/tmp/cq.err`\n\n已生成技能：[`clickhouse-query`]( /Users/zhangshichao/.codex/skills/clickhouse-query/SKILL.md )\n\n包含：\n\n- 自动读取项目 `.env` 中的两个集群：`flowdata-ka`、`flowdata-normal`\n- 使用共享账号密码，通过 ClickHouse HTTP 接口查询\n- 默认只允许查询类 SQL，拒绝写入、建表、删表和多语句\n- 支持 `JSONEachRow`、`CSVWithNames`、`PrettyCompact` 等格式\n- 不会把密码写入技能或输出\n\n使用方式：\n\n```text\n使用 $clickhouse-query 查询 flowdata-normal 集群中最近 7 天的订单数量。\n```\n\n也可以直接执行：\n\n```bash\npython3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py \\\n  --cluster flowdata-normal \\\n  --sql \"SHOW DATABASES\"\n```\n\n查看已配置集群：\n\n```bash\npython3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --list-clusters\n```\n\n如果 `.env` 路径变化，添加：\n\n```bash\n--env-file /绝对路径/.env\n```\n\n技能格式验证已通过，SQL 解析和只读保护测试也已通过。当前沙箱无法解析远端 ClickHouse 域名，因此未完成实际远程连接测试。\n[$clickhouse-query](~/.codex/skills/clickhouse-query/SKILL.md) brand\\_id=15056,这个品牌底下的店仓叫重庆万象城店的2026年08月15日-2026年08月21日的销售情况，其中会员和非会员的销售金额分别是多少。\n\n4 previous messages\n我将使用 `clickhouse-query` 技能查询 `flowdata-normal`（你未指定集群，按技能约定先用该集群）。我会先检查数据库和表结构，再按品牌、店仓和日期聚合会员/非会员销售金额；查询只读，不会修改数据。\nRan a command\nExplored a file\n- Read `~/.codex/skills/clickhouse-query/SKILL.md`\n\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SHOW DATABASES' --timeout 10`\n\n当前沙箱无法解析 ClickHouse 主机名。为了实际取得销售数据，需要允许一次受控的外部网络查询；我会先执行只读的 `SHOW DATABASES`，之后所有查询仍通过技能脚本并限制为只读。\nRan a command\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SHOW DATABASES' --timeout 15`\n\n1、我这个skills主要功能就是查询，而不是写入修改。你要保证测试连通性\n\n21 previous messages\n明白。这个技能会固定为只读查询工具，不支持写入或修改；我会补充显式的 `--ping` 连通性检查（本质是 `SELECT 1`），并实际对两个集群执行验证。由于涉及更新既有技能，我会同时按 `skill-creator` 的规范检查和修改它。\nExplored 3 files\n- Read `~/.codex/skills/.system/skill-creator/SKILL.md`\n- Read `~/.codex/skills/clickhouse-query/SKILL.md`\n- Read `~/.codex/skills/clickhouse-query/scripts/query_clickhouse.py`\n\n我会新增 `--ping` 模式，并把连通性验证写入技能流程：配置首次使用或变更后，先用 `SELECT 1` 检查指定集群；验证失败时停止查询并报告网络/鉴权问题，不切换集群或尝试写操作。\nEdited 3 files, ran 2 commands\n- Wrote `~/.codex/skills/clickhouse-query/SKILL.md` (+5 -4)\n- Wrote `~/.codex/skills/clickhouse-query/references/configuration.md` (+1 -0)\n- Wrote `~/.codex/skills/clickhouse-query/scripts/query_clickhouse.py` (+4 -3)\n- Ran `PYTHONPATH=/Users/zhangshichao/Documents/Workspace/aitest-skills/skills-专业版/.venv/lib/python3.12/site-packages python3 /Users/zhangshichao/.codex/skills/.system/skill-creator/scripts/quick_validate.py /Users/zhangshichao/.codex/skills/clickhouse-query`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 -  import importlib.util, sys\nfrom pathlib import Path\np=Path('/Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py')\nspec=importlib.util.spec_from_file_location('query_clickhouse', p)\nm=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\nseen={}\nclass Resp:\n    def __enter__(self): return self\n    def __exit__(self,*args): pass\n    def read(self): return b'{\"clickhouse_connection_ok\":1}\\n'\ndef fake_open(req, timeout):\n    seen['body']=req.data.decode('utf-8'); seen['auth']=req.headers['Authorization']; return Resp()\nm.urlopen=fake_open\nsys.argv=['query_clickhouse.py','--cluster','flowdata-normal','--ping']\nassert m.main()==0\nassert seen['body']=='SELECT 1 AS clickhouse_connection_ok\\nFORMAT JSONEachRow'\nassert seen['auth'].startswith('Basic ')\nprint('ping_request=ok')\nPY`\n\n`--ping` 已实现，并通过本地请求构造测试和技能结构验证。现在开始实际连通性测试：对两个集群各执行一次只读 `SELECT 1`，不访问业务表、不修改数据。\n\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-ka --ping --timeout 15`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --ping --timeout 15`\n\n两个集群的实际连通性均已通过，返回 `clickhouse_connection_ok = 1`。现在继续处理你先前的销售问题：先在 `flowdata-normal` 中定位交易明细表和会员标识字段，再做日期区间聚合。\n\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SHOW DATABASES' --format JSONEachRow --timeout 30`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SHOW TABLES FROM flowstock' --format JSONEachRow --timeout 30`\n- Ran `PYTHONDONTWRITEBYTECODE=1 python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-normal --sql 'SHOW TABLES FROM flowretail' --format JSONEachRow --timeout 30`\n\n表数量很大，完整枚举没有价值；已确认存在品牌维度分表。接下来改为在系统元数据中精确筛选名称含 `15056` 的表，再检查其字段，",
+    "title": "指标字典结构与字段治理",
+    "category": "BI",
+    "subcategory": "指标字典",
+    "tags": ["指标字典", "维度", "指标", "字段编码", "报表", "敏感权限", "上传标识"],
+    "summary": "指标字典 Sheet1 的 A1:U2869 包含 2,866 条数据行，区分维度、指标及筛选项，并记录字段编码、用户解释、内部说明、更新频率、报表、上传标识、敏感权限和商户可见性。",
+    "content": "原始文件为 /Users/zhangshichao/Desktop/店家/数据组业务梳理/指标字典.xlsx，工作表 Sheet1，范围 A1:U2869。第二行为字段名，第三行为技术字段映射，数据约包含1246条维度、1183条指标、17条维度/指标/筛选记录。字段治理列包括指标分组、字段分类、指标目录名、技术编码、用户解释、内部补充说明、更新频率、所属报表、字典上传标识、敏感权限分组、小二默认权限、平台/商户级自定义、基础指标配置、商户可见及基础/计算指标分类。",
     "source_date": "2026-08-28",
-    "source_ids": [
-      "ecde4eb9-1feb-4022-8662-24522d0fe6a2"
-    ],
-    "score": {
-      "reusability": 3,
-      "importance": 3,
-      "uniqueness": 3,
-      "stability": 3,
-      "personal_relevance": 3
-    },
-    "total_score": 15
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 5, "importance": 5, "uniqueness": 5, "stability": 4, "personal_relevance": 4},
+    "total_score": 23
+  },
+  {
+    "title": "商品与组织档案维度字段",
+    "category": "BI",
+    "subcategory": "指标字典",
+    "tags": ["档案-商品", "档案-会员", "档案-店仓渠道", "档案-人员", "SPU", "SKU"],
+    "summary": "指标字典集中定义商品 SPU/SKU、会员、店仓渠道和人员档案维度，覆盖基础属性、组织结构、供应商、价格带及标签等字段。",
+    "content": "档案-商品约195条维度，覆盖SPU/SKC/SKU图片、名称、货号、颜色、尺码、条码、商品类型、类目、品牌、年份、季节、价格带、供应商、销售属性等。档案-会员约196条维度，覆盖会员信息、标签、入会、来源、消费偏好等。档案-店仓渠道约141条，档案-人员约114条，另有供应商、部门、时间等档案维度。部分字段明确标记暂不添加、待新增、业务无存储或需额外关联 SCM，不能把空编码当成可用字段。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 4, "importance": 4, "uniqueness": 4, "stability": 4, "personal_relevance": 3},
+    "total_score": 19
+  },
+  {
+    "title": "零售销售金额与单效指标",
+    "category": "BI",
+    "subcategory": "指标计算",
+    "tags": ["销售金额", "单效销额", "单效数量", "客单价", "连带率", "销售数量", "支付方式"],
+    "summary": "零售指标按配置决定是否剔除商品、支付方式和运费；单效销额、单效数量、客单价和连带率均依赖统一的单效口径。",
+    "content": "零售-明细指标包括标准吊牌额=销售数量*标准吊牌价、订单吊牌额=订单详情吊牌价*销售数量、标准零售额=销售数量*标准零售价、商品销售价总额、优惠金额合计、商品实付金额、运费、销售数量、销售金额、单效销额和单效数量。销售金额根据配置决定剔除商品/支付方式及是否含运费；单效销额用于客单价、折扣率等指标，单效数量用于件单价。客单价=单效销额/单效单数，连带率=单效数量/单效单数；单效单数可按配置选择销售单数或订单笔数。运费按商品实付金额比例分摊，整单商品金额为0时需避免按0%分摊。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 5, "importance": 5, "uniqueness": 4, "stability": 4, "personal_relevance": 4},
+    "total_score": 22
+  },
+  {
+    "title": "商品成本计算",
+    "category": "BI",
+    "subcategory": "指标计算",
+    "tags": ["标准成本", "综合成本", "SKU", "SPU", "入库成本", "出库成本"],
+    "summary": "指标字典将标准成本、综合成本和各类出入库成本额分开定义，成本金额通常由数量乘对应成本单价，并在 SKU/SPU 及店仓范围内应用兜底。",
+    "content": "成本-出入库指标包括入库标准成本额=入库数量*商品标准成本价、出库标准成本额=出库数量*商品标准成本价、净入库标准成本额、调整标准成本额、盘点差异标准成本额及采购/配货/调拨入标准成本额。商品价格与成本字段按店仓、SKU及同款色存在最近采购入库、配货入库、调拨入库等单价，并在无直接记录时按同店仓/渠道相同款色 SKU 的可用单价平均值兜底，仍无数据时记0。商品成本计算还需结合标准成本与总部综合成本的既有配置和 CASE 优先级，未明确的 CASE 规则保持待验证。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 5, "importance": 5, "uniqueness": 4, "stability": 4, "personal_relevance": 4},
+    "total_score": 22
+  },
+  {
+    "title": "进销存期初期末与在途指标",
+    "category": "BI",
+    "subcategory": "指标计算",
+    "tags": ["进销存", "期初库存", "期末库存", "采购在途", "调拨在途", "配货在途", "退货在途"],
+    "summary": "进销存期初取所选期间上一个期末，期末库存由期初库存加净入库构成，各类在途分别按已提交出库/采购与未提交入库状态计算。",
+    "content": "进销存-期初期末定义期初库存、采购/调拨/配货/退货在途、流转在途、总在途和预计库存；例如期间为1月3日至1月28日时，期初取1月2日期末。期末库存数量=期初库存数量+进销存净入库数。期末采购在途=已提交采购单数量-采购入库数量，已完结商品完结当日记0；调拨在途=截至期末已提交调拨出库数-未提交调拨入库数，负数按0；配货在途、退货在途遵循对应单据状态。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 5, "importance": 5, "uniqueness": 4, "stability": 4, "personal_relevance": 4},
+    "total_score": 22
+  },
+  {
+    "title": "会员销售与新老会员指标",
+    "category": "BI",
+    "subcategory": "指标计算",
+    "tags": ["会员销售分析", "会员", "新会员", "累计消费", "成交人数", "首销回购"],
+    "summary": "会员指标字典覆盖累计消费、期间消费、新会员拉新、首购回购及成交人数等指标，按会员归属、开卡门店和销售时间等不同口径统计。",
+    "content": "会员-个人指标包含累计销售金额、数量、销售单数、订单笔数、单效单数、成交/销售次数、成交/退货数量和金额等；会员-拉新包含新增会员销售金额、单效金额、单效单数、客单价、件单价、连带率、折扣率和成交人数；会员-零售包含新会员第1次消费、期间消费和首销回购等。会员成交人数需按会员去重，同一天同一家门店多次购买按业务规则处理；跨店会员仍按品牌会员归类，统计门店口径必须依据指标定义区分开卡门店、会员归属门店和销售门店。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 5, "importance": 5, "uniqueness": 4, "stability": 4, "personal_relevance": 4},
+    "total_score": 22
+  },
+  {
+    "title": "订单支付预售与库存单据指标",
+    "category": "Projects",
+    "subcategory": "BI",
+    "tags": ["订单状态", "预售", "支付", "出入库", "单据", "换货", "退货"],
+    "summary": "指标字典按零售订单、预售、支付、出入库、调拨、采购、退货等业务单据定义状态、数量和金额指标，单据来源与状态不能混用。",
+    "content": "字典覆盖零售-订单、预售-明细、支付-明细、出入库-单据/明细/发货/采购/配货/调拨/退货/调整、储值、礼品卡和积分兑换等分组。支付类区分支付金额、销售支付金额、销售实际交易金额、储值充值本金、礼品卡实销、付费会员购买和积分兑换；订单类含销售单、换货单、退货单及预售状态。出入库和销售数量按不同单据及时间字段统计，不能把支付状态、订单状态、预售状态或库存单据状态当作同一状态体系。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 5, "importance": 4, "uniqueness": 4, "stability": 4, "personal_relevance": 3},
+    "total_score": 21
+  },
+  {
+    "title": "指标字典实现状态与待验证项",
+    "category": "BI",
+    "subcategory": "指标字典治理",
+    "tags": ["待新增", "暂不添加", "删除", "字典上传", "待验证", "商户可见"],
+    "summary": "指标字典中的上传、待新增、删除、暂不放和空编码是实现状态，不代表指标已可用；计算逻辑和权限字段需要按状态逐项确认。",
+    "content": "字典上传标识统计约2484条上传、36条待新增、10条删除、15条它表已有及147条不用；基础/计算分类约1894条基础、201条计算，并存在新增、保留、优化等状态。部分行缺少指标编码、报表或维度/指标分类，内部说明中明确业务无存储、需关联 SCM、组件上自定义或暂不添加。敏感权限分组包含成本、总部成本、供应商、商品、员工等，商户可见和小二默认权限不能由空值推断为公开。对待新增、删除、暂不放、未确认 CASE 或截图/外部链接内容，应保留待验证状态，不能当作已上线事实。",
+    "source_date": "2026-08-28",
+    "source_ids": ["e0bb1757-8f2d-4412-9878-dd198cb95950"],
+    "score": {"reusability": 4, "importance": 5, "uniqueness": 5, "stability": 4, "personal_relevance": 4},
+    "total_score": 22
   }
 ]

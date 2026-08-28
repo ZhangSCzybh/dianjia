@@ -1,10 +1,12 @@
 {
   "date": "2026-08-28",
   "source_ids": [
-    "ecde4eb9-1feb-4022-8662-24522d0fe6a2"
+    "ecde4eb9-1feb-4022-8662-24522d0fe6a2",
+    "e0bb1757-8f2d-4412-9878-dd198cb95950"
   ],
   "completed": [
-    "创建 ClickHouse 查询技能"
+    "创建 ClickHouse 查询技能",
+    "指标字典"
   ],
   "problems": [],
   "knowledge": [],
