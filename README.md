@@ -22,7 +22,7 @@ dianjia/
 ├── 03_Memory/      长期记忆，Markdown 事实来源
 ├── 04_Weekly/      周总结预留目录
 ├── 05_Monthly/     月总结预留目录
-├── 06_Archive/     版本、迁移和历史归档
+├── 06_Archive/     版本、迁移和历史归档（含 General 等已归档分类）
 └── INDEX.md         自动生成的知识导航
 ```
 
@@ -272,7 +272,7 @@ discard   → 不写长期记忆，只记录 memory_actions
 
 `INDEX.md` 是人类导航，不是数据库。它由系统从 active Markdown 记忆自动生成，使用相对 Markdown 链接。不要手动将 `INDEX.md` 当作唯一索引维护。
 
-当 SQLite 丢失、Markdown 被手动修改，或完成批量迁移后，执行项目中的 `rebuild-index` 重建索引。旧版无 frontmatter 的长期记忆可通过 `migrate-legacy` 自动迁移；迁移前的原文件快照位于 `06_Archive/migrations/`。
+当 SQLite 丢失、Markdown 被手动修改，或完成批量迁移后，执行项目中的 `rebuild-index` 重建索引。旧版无 frontmatter 的长期记忆可通过 `migrate-legacy` 自动迁移；迁移前的原文件快照位于 `06_Archive/migrations/`。已合并、废弃的分类历史文件可放在 `06_Archive/<category>/`（例如 `06_Archive/General/`），这些文件不参与 active 记忆索引。
 
 ## RAG 使用规则
 
