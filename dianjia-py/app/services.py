@@ -45,11 +45,27 @@ class MemoryService:
         day = source.source_date
         target = self.s.knowledge_root / "00_Inbox" / f"{day}--{slugify(source.title)}.md"
         if target.exists():
-            target = target.with_name(f"{day}--{slugify(source.title)}-{source.content_hash[:8]}.md")
-        target.write_text(source.content, encoding="utf-8")
+            # A previous import may have written the file before its SQLite
+            # transaction failed. Reuse that orphan instead of duplicating it.
+            try:
+                if target.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n").strip() + "\n" == normalized:
+                    pass
+                else:
+                    target = target.with_name(f"{day}--{slugify(source.title)}-{source.content_hash[:8]}.md")
+            except OSError:
+                target = target.with_name(f"{day}--{slugify(source.title)}-{source.content_hash[:8]}.md")
+        created_file = not target.exists()
+        if created_file:
+            target.write_text(source.content, encoding="utf-8")
         rel = target.relative_to(self.s.knowledge_root).as_posix()
-        self.conn.execute("INSERT INTO sources(id, source_type, content_hash, path, source_date, created_at, title, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (source.source_id, source.source_type, source.content_hash, rel, source.source_date, source.created_at, source.title, json.dumps(source.metadata, ensure_ascii=False)))
-        self.conn.commit()
+        try:
+            self.conn.execute("INSERT INTO sources(id, source_type, content_hash, path, source_date, created_at, title, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (source.source_id, source.source_type, source.content_hash, rel, source.source_date, source.created_at, source.title, json.dumps(source.metadata, ensure_ascii=False)))
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            if created_file:
+                target.unlink(missing_ok=True)
+            raise
         return target
 
     def ingest_directory(self, directory: Path, source_date: str | None = None) -> list[Path]:
@@ -123,24 +139,76 @@ class MemoryService:
         ai_extracted = False
         if ai.enabled:
             try:
-                payload = self._json_response(ai.ask([{"role": "system", "content": "你是长期记忆提取器。只输出 JSON 数组，每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score。只提取稳定且可复用的知识。"}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": body}, ensure_ascii=False)}]))
+                payload = self._json_response(ai.ask([{"role": "system", "content": "你是长期记忆提取器。只输出 JSON 数组。按每个独立、可复用的主题合并内容，不要把日报小标题（如支持、推荐组合、项目进展）单独当作记忆；每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score。title 要具体描述问题或规则（10-40 字），category 优先使用 SQL、BI、Testing、AI、Projects，无法判断才用 General。只提取稳定且可复用的知识。"}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": body}, ensure_ascii=False)}]))
                 candidates = [self._normalize_candidate(item, day, summary.get("source_ids", [])) for item in payload]
                 ai_extracted = True
             except (RuntimeError, ValueError, TypeError):
                 candidates = []
         if ai_extracted:
             return self._write_candidates(day, candidates)
-        for heading, content in re.findall(r"^###\s+(.+?)\n([\s\S]*?)(?=^###\s+|\Z)", body, re.M):
-            content = content.strip()
-            if not content:
-                continue
-            title = heading.strip()
-            if title.startswith("记录 "):
-                first = next((line.strip().lstrip("# ") for line in content.splitlines() if line.strip()), title)
-                title = first[:100]
-            if not any(item["title"] == title for item in candidates):
-                candidates.append(self._normalize_candidate({"title": title, "category": "General", "tags": [], "summary": content[:240], "content": content, "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}}, day, summary.get("source_ids", [])))
+        candidates = self._fallback_candidates(body, day, summary.get("source_ids", []))
         return self._write_candidates(day, candidates)
+
+    @classmethod
+    def _fallback_candidates(cls, body: str, day: str, source_ids: list[str]) -> list[dict[str, Any]]:
+        """Extract one coherent candidate per source when AI extraction is unavailable."""
+        records = re.findall(r"^###\s+记录\s+\d+\s*$([\s\S]*?)(?=^###\s+记录\s+\d+\s*$|\Z)", body, re.M)
+        if not records:
+            records = [body]
+        candidates = []
+        for raw in records:
+            content = cls._clean_transcript(raw)
+            if len(content.strip()) < 20:
+                continue
+            title = cls._fallback_title(content)
+            category, subcategory, tags = cls._classify_content(content)
+            candidate = {"title": title, "category": category, "subcategory": subcategory, "tags": tags, "summary": cls._fallback_summary(content), "content": content[:16000], "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}}
+            candidates.append(cls._normalize_candidate(candidate, day, source_ids))
+        return candidates
+
+    @staticmethod
+    def _clean_transcript(text: str) -> str:
+        text = re.sub(r"</?(?:details|summary)(?:\s[^>]*)?>", "", text, flags=re.I)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = re.sub(r"^\s*>\s?", "", text, flags=re.M)
+        text = re.sub(r"^\s*Ran \d+ commands?\s*$", "", text, flags=re.M | re.I)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    @staticmethod
+    def _fallback_title(content: str) -> str:
+        generic = {"支持", "不支持或存在风险", "推荐组合", "解决方案", "知识沉淀", "项目进展"}
+        headings = [re.sub(r"^#+\s*", "", line).strip() for line in content.splitlines() if re.match(r"^#{1,3}\s+", line)]
+        title = next((item for item in headings if item and item not in generic and not re.match(r"^\d+[.、]\s*", item)), "")
+        if not title:
+            first = next((line.strip(" -*") for line in content.splitlines() if line.strip()), "历史对话知识")
+            title = first[:80]
+        if "clickhouse" in content.lower() and "技能" in title:
+            return "ClickHouse 查询技能与只读查询规范"
+        return title[:100]
+
+    @staticmethod
+    def _fallback_summary(content: str) -> str:
+        paragraphs = [re.sub(r"^#+\s*", "", p).strip() for p in re.split(r"\n\s*\n", content) if p.strip()]
+        summary = next((p for p in paragraphs if not p.startswith(("[$", "Ran "))), paragraphs[0] if paragraphs else "")
+        return re.sub(r"\s+", " ", summary)[:240]
+
+    @staticmethod
+    def _classify_content(content: str) -> tuple[str, str, list[str]]:
+        rules = {
+            "SQL": ("查询与数据", ["clickhouse", "sql", "select", "join", "数据库", "数据表", "字段", "唯一键", "去重键"]),
+            "BI": ("指标计算", ["报表", "指标", "同比", "环比", "维度", "粒度", "看板", "销售", "利润"]),
+            "Testing": ("测试方法", ["测试", "校验", "对账", "验证", "断言", "用例"]),
+            "AI": ("AI应用", ["ai", "skill", "知识库", "rag", "模型", "提示词"]),
+            "Projects": ("项目", ["项目", "需求", "功能", "接口", "上线", "开发"]),
+        }
+        lowered = content.lower()
+        scored = [(sum(lowered.count(term.lower()) for term in terms), category, subcategory, terms) for category, (subcategory, terms) in rules.items()]
+        score, category, subcategory, terms = max(scored, key=lambda item: (item[0], -list(rules).index(item[1])))
+        if score == 0:
+            return "General", "", []
+        tags = [term for term in terms if term.lower() in lowered][:8]
+        return category, subcategory, tags
 
     def _write_candidates(self, day: str, candidates: list[dict[str, Any]]) -> Path:
         target = self.s.knowledge_root / "02_Candidate" / f"{day}-candidates.json"
@@ -158,9 +226,23 @@ class MemoryService:
     def _normalize_candidate(item: dict[str, Any], day: str, source_ids: list[str]) -> dict[str, Any]:
         if not isinstance(item, dict) or not str(item.get("title", "")).strip() or not str(item.get("content", "")).strip():
             raise ValueError("candidate title/content is required")
+        content = str(item["content"]).strip()
+        title = str(item["title"]).strip()
+        if title in {"支持", "不支持或存在风险", "推荐组合", "解决方案", "知识沉淀", "项目进展"} or len(title) < 4:
+            title = MemoryService._fallback_title(content)
+        category = str(item.get("category") or "General")
+        if category not in {"SQL", "BI", "Testing", "AI", "Projects", "General"}:
+            category = "General"
+        subcategory = item.get("subcategory")
+        if category == "General":
+            inferred, inferred_subcategory, inferred_tags = MemoryService._classify_content(content)
+            if inferred != "General":
+                category, subcategory = inferred, subcategory or inferred_subcategory
+                if not item.get("tags"):
+                    item = {**item, "tags": inferred_tags}
         score = item.get("score") if isinstance(item.get("score"), dict) else {}
         score = {key: max(0, min(5, int(score.get(key, 0)))) for key in ("reusability", "importance", "uniqueness", "stability", "personal_relevance")}
-        return {"title": str(item["title"]).strip(), "category": str(item.get("category") or "General"), "subcategory": item.get("subcategory"), "tags": [str(x) for x in (item.get("tags") or [])], "summary": str(item.get("summary") or str(item["content"])[:240]), "content": str(item["content"]).strip(), "source_date": day, "source_ids": [str(x) for x in (item.get("source_ids") or source_ids)], "score": score, "total_score": int(item.get("total_score", sum(score.values())))}
+        return {"title": title, "category": category, "subcategory": subcategory, "tags": [str(x) for x in (item.get("tags") or [])], "summary": str(item.get("summary") or content[:240]), "content": content, "source_date": day, "source_ids": [str(x) for x in (item.get("source_ids") or source_ids)], "score": score, "total_score": int(item.get("total_score", sum(score.values())))}
 
     def search(self, keyword: str, limit: int = 10):
         like = f"%{keyword}%"

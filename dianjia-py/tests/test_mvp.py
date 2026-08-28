@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.services import MemoryService
-from app.markdown import dump_frontmatter
+from app.markdown import dump_frontmatter, parse_frontmatter
 from app.migration import migrate_legacy_memories
 
 
@@ -27,6 +27,54 @@ class MvpTest(unittest.TestCase):
             answer, memories = service.ask("日期查询", limit=3, client=OfflineClient())
             self.assertEqual(len(memories), 1)
             self.assertIn("SQL 日期查询", answer)
+
+    def test_ingest_recovers_orphan_inbox_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = MemoryService(Settings(root, root / "kb", root / "data", root / "data/db.sqlite"))
+            content = "# 已存在的导入\n\n上次导入时数据库登记失败。\n"
+            orphan = root / "kb/00_Inbox/2026-08-28--web-conversation.md"
+            orphan.parent.mkdir(parents=True)
+            orphan.write_text(content, encoding="utf-8")
+
+            recovered = service.ingest_text(content, "web-conversation", "2026-08-28", "web")
+
+            self.assertEqual(recovered, orphan)
+            self.assertEqual(service.conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0], 1)
+            self.assertEqual(len(list(orphan.parent.glob("*.md"))), 1)
+
+    def test_fallback_extraction_groups_sections_and_classifies_content(self):
+        body = """## 原始记录
+
+### 记录 1
+
+# ClickHouse 同环比查询规则
+
+<details><summary>历史消息</summary>
+### 支持
+- 年月和年周
+</details>
+"""
+        candidates = MemoryService._fallback_candidates(body, "2026-08-28", ["source-1"])
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["category"], "SQL")
+        self.assertEqual(candidates[0]["title"], "ClickHouse 同环比查询规则")
+
+    def test_frontmatter_handles_markdown_separators_and_multiline_values(self):
+        text = dump_frontmatter({"id": "one", "summary": "第一行\n第二行", "status": "active"}, "正文\n\n---\n\n继续正文")
+        meta, body = parse_frontmatter(text)
+        self.assertEqual(meta["summary"], "第一行\n第二行")
+        self.assertEqual(meta["status"], "active")
+        self.assertIn("---", body)
+
+    def test_candidate_normalization_repairs_generic_ai_fields(self):
+        candidate = MemoryService._normalize_candidate({
+            "title": "支持",
+            "category": "General",
+            "content": "ClickHouse SQL 查询应使用带年份的 yearWeek，避免同比重复。",
+        }, "2026-08-28", ["source-1"])
+        self.assertNotEqual(candidate["title"], "支持")
+        self.assertEqual(candidate["category"], "SQL")
 
     def test_irrelevant_query_does_not_recall_generic_notes(self):
         with tempfile.TemporaryDirectory() as tmp:

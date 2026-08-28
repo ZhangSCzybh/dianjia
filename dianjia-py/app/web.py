@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import threading
+import traceback
+import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -11,6 +14,20 @@ from .config import settings
 from .services import MemoryService
 
 WEB_ROOT = Path(__file__).resolve().parent.parent / "web"
+RUN_JOBS: dict[str, dict] = {}
+RUN_JOBS_LOCK = threading.Lock()
+
+
+def _run_daily_job(job_id: str, day: str | None) -> None:
+    try:
+        outcomes = Handler.service.run_daily(day)
+    except Exception as exc:
+        traceback.print_exc()
+        with RUN_JOBS_LOCK:
+            RUN_JOBS[job_id] = {"status": "failed", "error": str(exc)}
+    else:
+        with RUN_JOBS_LOCK:
+            RUN_JOBS[job_id] = {"status": "completed", "outcomes": outcomes}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -40,6 +57,11 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(parsed.query).get("q", [""])[0]
                 limit = int(parse_qs(parsed.query).get("limit", [10])[0])
                 self._send([dict(row) for row in self.service.search(query, limit)] if query else [])
+            elif parsed.path.startswith("/api/run-daily/"):
+                job_id = parsed.path.rsplit("/", 1)[-1]
+                with RUN_JOBS_LOCK:
+                    job = RUN_JOBS.get(job_id)
+                self._send(job or {"error": "run-daily job not found"}, HTTPStatus.OK if job else HTTPStatus.NOT_FOUND)
             else:
                 self._send({"error": "Not found"}, HTTPStatus.NOT_FOUND)
         except Exception as exc:
@@ -66,7 +88,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"outcomes": self.service.process(Path(candidate) if candidate else None)})
             elif self.path == "/api/run-daily":
                 payload = self._json()
-                self._send({"outcomes": self.service.run_daily(payload.get("date"))})
+                job_id = uuid.uuid4().hex
+                with RUN_JOBS_LOCK:
+                    RUN_JOBS[job_id] = {"status": "running"}
+                threading.Thread(target=_run_daily_job, args=(job_id, payload.get("date")), daemon=True).start()
+                self._send({"job_id": job_id, "status": "running"}, HTTPStatus.ACCEPTED)
             elif self.path == "/api/ask":
                 payload = self._json()
                 question = str(payload.get("question", "")).strip()
@@ -99,4 +125,3 @@ def serve(host: str = "127.0.0.1", port: int = 8765):
 
 if __name__ == "__main__":
     serve()
-
