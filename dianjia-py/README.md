@@ -28,6 +28,7 @@ python main.py web --port 9000     # 使用其他端口
 推荐每天按以下顺序操作：
 
 1. 在“导入对话”粘贴当天的完整对话或工作记录，填写容易识别的记录名称；日期留空即使用当天。
+   Web 导入框最多接受 100,000 个字符，界面会实时显示计数；后端也会再次校验，超限内容不会写入知识库。
 2. 点击“导入”。内容会进入 `00_Inbox`，相同内容会自动去重。
 3. 点击“一键处理”。Web 会立即返回任务并在页面轮询进度；后台依次生成日报、候选记忆、判断归档动作并更新索引。即使 AI 请求较慢，也不会因浏览器等待超时而丢失任务。
 4. 在“知识库问答”输入问题。系统先检索最高相关的长期记忆，再将这些内容交给 AI 回答。
@@ -92,6 +93,12 @@ python main.py run-daily --date 2026-08-28
 
 `run-daily` 等价于连续执行 `daily`、`memory extract`、`memory process`。它会写入或更新长期记忆；与只生成日报的 `daily` 不同，适合在当天记录全部导入后使用。
 
+`run-daily` 对 Source 按增量处理：首次运行会处理当天的新 Source；同一天再次运行时，未变化且已经完成处理（或已进入待复核）的 Source 会自动跳过，因此不会重复创建记忆、追加版本或写入处理动作。只有新导入的 Source、Source 文件内容发生变化的记录，或没有 `source_ids` 的手工候选，才会再次进入判断流程。日报和候选 JSON 仍可以每次重新生成，这是为了反映当天最新的 Inbox 内容。处理状态保存在 SQLite 的 `sources.processed_at`、`pipeline_status` 和 `last_candidate_hash` 字段中。
+
+命令行会在终端（标准错误输出）显示实际模式，例如 `[daily] 使用 AI 总结`、`[extract] 使用本地兜底`、`[judge] AI 决策 2 条，本地规则 1 条`。因此不要只看最终的 `create/update` 结果；以这些阶段标记判断是否真正请求了 AI。`ask` 也会显示 `[ask] 使用 AI 回答` 或 `[ask] AI 失败，返回本地检索上下文`。
+
+如果希望强制重新处理某个候选，可使用分步命令 `python main.py memory process <候选文件>`；该命令默认不启用 Source 增量跳过，会按候选文件执行一次处理。修改 Source 后重新运行 `run-daily`，程序会通过内容哈希检测变化并重新处理。
+
 Web 的 `/api/run-daily` 使用异步任务模式：POST 后返回 `job_id`，再通过 `/api/run-daily/<job_id>` 查询 `running`、`completed` 或 `failed` 状态。命令行 `run-daily` 不变，仍会等待流程完成后再输出结果。
 
 ### 查询与维护
@@ -139,6 +146,8 @@ AI_MODEL=gpt-5
 ```text
 ${AI_BASE_URL}/chat/completions
 ```
+
+为避免网关因请求过大主动断开连接，日报总结和候选提取发送给 AI 的单次上下文会限制在约 12 万字符；完整原始记录仍会保存在 `01_Daily`，不会被截断。若服务商返回 `RemoteDisconnected`、超时或其他连接错误，程序会自动切换本地兜底规则，`run-daily` 不会因此中断。
 
 也可以通过同名环境变量临时覆盖 `.env`。AI 用于日报总结、候选提取、记忆判断和 RAG 回答；调用失败时，日报、提取和判断会改用本地兜底规则，问答则返回检索上下文与错误说明。候选提取的本地兜底会按每条原始 Source 合并为一条候选，清理 `<details>` 等对话包装，并依据内容自动归入 `SQL`、`BI`、`Testing`、`AI` 或 `Projects`；只有无法识别主题时才使用 `General`。
 

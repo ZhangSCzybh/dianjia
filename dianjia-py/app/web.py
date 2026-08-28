@@ -16,6 +16,7 @@ from .services import MemoryService
 WEB_ROOT = Path(__file__).resolve().parent.parent / "web"
 RUN_JOBS: dict[str, dict] = {}
 RUN_JOBS_LOCK = threading.Lock()
+MAX_WEB_INPUT_CHARS = 100_000
 
 
 def _run_daily_job(job_id: str, day: str | None) -> None:
@@ -74,6 +75,8 @@ class Handler(BaseHTTPRequestHandler):
                 text = str(payload.get("content", "")).strip()
                 if not text:
                     return self._send({"error": "content is required"}, HTTPStatus.BAD_REQUEST)
+                if len(text) > MAX_WEB_INPUT_CHARS:
+                    return self._send({"error": f"导入内容不能超过 {MAX_WEB_INPUT_CHARS:,} 个字符，当前为 {len(text):,} 个字符"}, HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
                 path = self.service.ingest_text(text, payload.get("name", "web-input"), payload.get("date"), "web")
                 self._send({"path": str(path)})
             elif self.path == "/api/daily":

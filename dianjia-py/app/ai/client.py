@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import http.client
 import os
 import urllib.request
 import urllib.error
@@ -48,4 +49,8 @@ class AIClient:
             raise RuntimeError(f"AI API 返回 HTTP {exc.code}（请求地址：{self.base_url}/chat/completions）：{detail[:500]}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"无法连接 AI API: {exc.reason}") from exc
+        except (http.client.HTTPException, TimeoutError, ConnectionError, OSError) as exc:
+            # Some gateways close the socket without returning an HTTP status.
+            # Keep the RuntimeError contract so callers can use local fallback.
+            raise RuntimeError(f"AI API 连接中断: {exc}") from exc
         return result["choices"][0]["message"]["content"]

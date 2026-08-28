@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS memory_actions (
 );
 CREATE TABLE IF NOT EXISTS sources (
  id TEXT PRIMARY KEY, source_type TEXT, content_hash TEXT UNIQUE, path TEXT,
- source_date TEXT, created_at TEXT
+ source_date TEXT, created_at TEXT, processed_at TEXT,
+ pipeline_status TEXT DEFAULT 'pending', last_candidate_hash TEXT
 );
 """
 
@@ -40,13 +41,30 @@ def connect(path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     migrations = {
-        "sources": [("title", "TEXT"), ("metadata", "TEXT")],
+        "sources": [
+            ("title", "TEXT"),
+            ("metadata", "TEXT"),
+            ("processed_at", "TEXT"),
+            ("pipeline_status", "TEXT DEFAULT 'pending'"),
+            ("last_candidate_hash", "TEXT"),
+        ],
     }
     for table, columns in migrations.items():
         existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         for name, kind in columns:
             if name not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+    # Backfill the idempotency marker for Sources that were already linked to
+    # a long-term memory before pipeline_status was introduced. Sources with
+    # no historical memory relation remain pending and will be processed once.
+    conn.execute("""UPDATE sources
+        SET processed_at = COALESCE(processed_at, created_at),
+            pipeline_status = 'processed'
+        WHERE processed_at IS NULL
+          AND EXISTS (
+              SELECT 1 FROM memory_sources ms
+              WHERE ms.source_path = sources.path
+          )""")
     conn.commit()
     return conn
 

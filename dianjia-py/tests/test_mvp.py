@@ -1,5 +1,8 @@
 import tempfile
 import unittest
+import json
+import http.client
+from unittest.mock import patch
 from pathlib import Path
 
 from app.config import Settings
@@ -9,6 +12,19 @@ from app.migration import migrate_legacy_memories
 
 
 class MvpTest(unittest.TestCase):
+    def test_ai_connection_drop_is_recoverable(self):
+        from app.ai.client import AIClient
+
+        client = AIClient(api_key="test-key", base_url="https://example.test/v1", model="test")
+        with patch("urllib.request.urlopen", side_effect=http.client.RemoteDisconnected("closed")):
+            with self.assertRaisesRegex(RuntimeError, "AI API 连接中断"):
+                client.ask([])
+
+    def test_ai_prompt_is_bounded(self):
+        bounded = MemoryService._truncate_for_ai("x" * 200000)
+        self.assertLessEqual(len(bounded), 120100)
+        self.assertIn("中间内容因 AI 请求长度限制已省略", bounded)
+
     def test_ingest_daily_process_and_search(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -42,6 +58,33 @@ class MvpTest(unittest.TestCase):
             self.assertEqual(recovered, orphan)
             self.assertEqual(service.conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0], 1)
             self.assertEqual(len(list(orphan.parent.glob("*.md"))), 1)
+
+    def test_run_daily_is_idempotent_for_unchanged_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = MemoryService(Settings(root, root / "kb", root / "data", root / "data/db.sqlite"))
+            source = root / "conversation.md"
+            source.write_text("# 库存唯一键处理\n\n使用 SKU 与店铺编码组合键去重。\n", encoding="utf-8")
+            service.ingest(source, "2026-08-28")
+            service.daily("2026-08-28")
+            candidate_file = service.extract("2026-08-28")
+
+            first = service.process(candidate_file, skip_processed_sources=True)
+            actions_after_first = service.conn.execute("SELECT COUNT(*) FROM memory_actions").fetchone()[0]
+            memories_after_first = service.conn.execute("SELECT COUNT(*) FROM memories WHERE status = 'active'").fetchone()[0]
+            second = service.process(candidate_file, skip_processed_sources=True)
+
+            self.assertTrue(first)
+            self.assertEqual(second, [])
+            self.assertEqual(service.conn.execute("SELECT COUNT(*) FROM memory_actions").fetchone()[0], actions_after_first)
+            self.assertEqual(service.conn.execute("SELECT COUNT(*) FROM memories WHERE status = 'active'").fetchone()[0], memories_after_first)
+
+            # Editing the imported Source makes it eligible again.
+            source_row = service.conn.execute("SELECT path FROM sources LIMIT 1").fetchone()
+            (root / "kb" / source_row["path"]).write_text("# 库存唯一键处理\n\n改为 SKU、店铺编码和日期组合键。\n", encoding="utf-8")
+            changed_candidate = {**json.loads(candidate_file.read_text(encoding="utf-8"))[0], "content": "改为 SKU、店铺编码和日期组合键。"}
+            candidate_file.write_text(json.dumps([changed_candidate], ensure_ascii=False), encoding="utf-8")
+            self.assertTrue(service.process(candidate_file, skip_processed_sources=True))
 
     def test_fallback_extraction_groups_sections_and_classifies_content(self):
         body = """## 原始记录

@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import re
+import sys
 import uuid
 from datetime import date, datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ class MemoryService:
         self.s = settings
         self.s.knowledge_root.mkdir(parents=True, exist_ok=True)
         self.conn = connect(self.s.db_path)
+        self._last_judge_mode = "local"
 
     def init(self) -> None:
         for directory in ("00_Inbox", "01_Daily", "02_Candidate", "03_Memory", "04_Weekly", "05_Monthly", "06_Archive"):
@@ -81,7 +83,10 @@ class MemoryService:
         """Run the complete offline daily pipeline in one command."""
         self.daily(day)
         candidate = self.extract(day)
-        return self.process(candidate)
+        # Re-running the same day is safe: only new or changed Sources enter
+        # the memory pipeline.  The daily report/candidate file may still be
+        # regenerated, but existing long-term memories are not touched again.
+        return self.process(candidate, skip_processed_sources=True)
 
     def daily(self, day: str | None = None) -> Path:
         self.init()
@@ -106,12 +111,17 @@ class MemoryService:
         fallback = {"date": day, "source_ids": source_ids, "completed": [re.sub(r"^#\s*", "", item.splitlines()[0])[:200] for item in entries if item], "problems": [], "knowledge": [], "projects": [], "tomorrow": ["根据今日记录补充后续行动"]}
         ai = AIClient()
         if not ai.enabled or not entries:
+            print("[daily] 使用本地兜底（未配置 AI_API_KEY 或没有记录）", file=sys.stderr)
             return fallback
         try:
-            result = self._json_response(ai.ask([{"role": "system", "content": "你是每日总结助手。只输出合法 JSON，字段必须为 date、source_ids、completed、problems、knowledge、projects、tomorrow，所有列表元素使用字符串。"}, {"role": "user", "content": json.dumps({"date": day, "source_ids": source_ids, "records": entries}, ensure_ascii=False)}]))
+            per_record = max(1000, 120000 // max(1, len(entries)))
+            records = [self._truncate_for_ai(item, per_record) for item in entries]
+            result = self._json_response(ai.ask([{"role": "system", "content": "你是每日总结助手。只输出合法 JSON，字段必须为 date、source_ids、completed、problems、knowledge、projects、tomorrow，所有列表元素使用字符串。"}, {"role": "user", "content": json.dumps({"date": day, "source_ids": source_ids, "records": records}, ensure_ascii=False)}]))
             result["date"], result["source_ids"] = day, source_ids
+            print("[daily] 使用 AI 总结", file=sys.stderr)
             return {key: result.get(key, []) if key not in ("date", "source_ids") else result[key] for key in fallback}
-        except (RuntimeError, ValueError, TypeError):
+        except (RuntimeError, ValueError, TypeError) as exc:
+            print(f"[daily] AI 失败，使用本地兜底：{exc}", file=sys.stderr)
             return fallback
 
     @staticmethod
@@ -126,6 +136,16 @@ class MemoryService:
         body.extend(f"### 记录 {i}\n\n{item}" for i, item in enumerate(entries, 1))
         return body
 
+    @staticmethod
+    def _truncate_for_ai(text: str, max_chars: int = 120000) -> str:
+        """Bound gateway prompts while retaining both the beginning and end."""
+        text = str(text or "")
+        if len(text) <= max_chars:
+            return text
+        head = max_chars * 2 // 3
+        tail = max_chars - head
+        return text[:head] + "\n\n[中间内容因 AI 请求长度限制已省略]\n\n" + text[-tail:]
+
     def extract(self, day: str | None = None) -> Path:
         day = day or date.today().isoformat()
         daily_path = self.s.knowledge_root / "01_Daily" / day[:4] / day[5:7] / f"{day}.md"
@@ -139,11 +159,16 @@ class MemoryService:
         ai_extracted = False
         if ai.enabled:
             try:
-                payload = self._json_response(ai.ask([{"role": "system", "content": "你是长期记忆提取器。只输出 JSON 数组。按每个独立、可复用的主题合并内容，不要把日报小标题（如支持、推荐组合、项目进展）单独当作记忆；每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score。title 要具体描述问题或规则（10-40 字），category 优先使用 SQL、BI、Testing、AI、Projects，无法判断才用 General。只提取稳定且可复用的知识。"}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": body}, ensure_ascii=False)}]))
+                prompt_body = self._truncate_for_ai(body)
+                payload = self._json_response(ai.ask([{"role": "system", "content": "你是长期记忆提取器。只输出 JSON 数组。按每个独立、可复用的主题合并内容，不要把日报小标题（如支持、推荐组合、项目进展）单独当作记忆；每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score。title 要具体描述问题或规则（10-40 字），category 优先使用 SQL、BI、Testing、AI、Projects，无法判断才用 General。只提取稳定且可复用的知识。"}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": prompt_body}, ensure_ascii=False)}]))
                 candidates = [self._normalize_candidate(item, day, summary.get("source_ids", [])) for item in payload]
                 ai_extracted = True
-            except (RuntimeError, ValueError, TypeError):
+                print("[extract] 使用 AI 提取候选", file=sys.stderr)
+            except (RuntimeError, ValueError, TypeError) as exc:
+                print(f"[extract] AI 失败，使用本地兜底：{exc}", file=sys.stderr)
                 candidates = []
+        else:
+            print("[extract] 使用本地兜底（未配置 AI_API_KEY）", file=sys.stderr)
         if ai_extracted:
             return self._write_candidates(day, candidates)
         candidates = self._fallback_candidates(body, day, summary.get("source_ids", []))
@@ -392,10 +417,13 @@ class MemoryService:
         context, memories = self.build_context(query, limit)
         ai = client or AIClient()
         if not ai.enabled:
+            print("[ask] 使用本地检索（未配置 AI_API_KEY）", file=sys.stderr)
             return f"未配置 AI_API_KEY，以下是检索到的知识库上下文：\n\n{context}", memories
         try:
             answer = ai.ask([{"role": "system", "content": "你是个人知识助手。优先依据历史记忆回答；历史内容不足时明确说明。不要把推测写成历史事实。"}, {"role": "user", "content": f"历史知识：\n{context}\n\n用户问题：{query}"}])
+            print("[ask] 使用 AI 回答", file=sys.stderr)
         except RuntimeError as exc:
+            print(f"[ask] AI 失败，返回本地检索上下文：{exc}", file=sys.stderr)
             answer = f"AI 调用失败（{exc}）。以下是已检索到的知识库上下文：\n\n{context}"
         return answer, memories
 
@@ -408,7 +436,7 @@ class MemoryService:
             raise FileNotFoundError(path)
         return path.read_text(encoding="utf-8")
 
-    def process(self, candidate_file: Path | None = None) -> list[str]:
+    def process(self, candidate_file: Path | None = None, *, skip_processed_sources: bool = False) -> list[str]:
         self.init()
         if candidate_file is None:
             files = sorted((self.s.knowledge_root / "02_Candidate").glob("*-candidates.json"))
@@ -417,8 +445,28 @@ class MemoryService:
             candidate_file = self.s.knowledge_root / "02_Candidate" / candidate_file
         candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
         outcomes = []
+        judge_ai_count = 0
+        judge_local_count = 0
+        skipped_count = 0
+
+        # Take a snapshot before processing.  A source can produce more than
+        # one candidate; marking it processed after the first candidate must
+        # not cause the remaining candidates from this run to be skipped.
+        eligible_source_ids: set[str] | None = None
+        if skip_processed_sources:
+            source_ids = {str(source_id) for candidate in candidates for source_id in (candidate.get("source_ids") or [])}
+            eligible_source_ids = {source_id for source_id in source_ids if self._source_needs_processing(source_id)}
+
         for candidate in candidates:
+            candidate_source_ids = [str(source_id) for source_id in (candidate.get("source_ids") or [])]
+            if eligible_source_ids is not None and candidate_source_ids and not any(source_id in eligible_source_ids for source_id in candidate_source_ids):
+                skipped_count += 1
+                continue
             decision = self._judge_candidate(candidate)
+            if self._last_judge_mode == "ai":
+                judge_ai_count += 1
+            else:
+                judge_local_count += 1
             action = decision.action
             memory_id = decision.target_memory_id
             if action == "create":
@@ -436,13 +484,53 @@ class MemoryService:
                 pass
             audit_payload = {"candidate": candidate, "decision": {"action": decision.action, "target_memory_id": decision.target_memory_id, "confidence": decision.confidence, "total_score": decision.total_score, "changes": decision.changes, "merge_memory_ids": decision.merge_memory_ids}}
             self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, decision.reason, json.dumps(audit_payload, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
-            if memory_id and candidate.get("source_ids"):
-                for source_id in candidate["source_ids"]:
-                    self.conn.execute("INSERT INTO memory_sources(memory_id, source_date, source_type, source_path, created_at) SELECT ?, source_date, source_type, path, ? FROM sources WHERE id = ?", (memory_id, datetime.now().isoformat(timespec="seconds"), source_id))
+            if memory_id and candidate_source_ids:
+                for source_id in candidate_source_ids:
+                    # Older databases do not have a uniqueness constraint on
+                    # memory_sources, so guard the relation explicitly.
+                    self.conn.execute("""INSERT INTO memory_sources(memory_id, source_date, source_type, source_path, created_at)
+                        SELECT ?, source_date, source_type, path, ? FROM sources
+                        WHERE id = ? AND NOT EXISTS (
+                            SELECT 1 FROM memory_sources ms
+                            WHERE ms.memory_id = ? AND ms.source_path = sources.path
+                        )""", (memory_id, datetime.now().isoformat(timespec="seconds"), source_id, memory_id))
+            if candidate_source_ids:
+                self._mark_sources_processed(candidate_source_ids, action, candidate)
             self.conn.commit()
             outcomes.append(f"{action}: {candidate['title']}")
+        if candidates:
+            print(f"[judge] AI 决策 {judge_ai_count} 条，本地规则 {judge_local_count} 条", file=sys.stderr)
+        if skipped_count:
+            print(f"[process] 跳过 {skipped_count} 条未变化候选（Source 已处理）", file=sys.stderr)
         self.rebuild_index()
         return outcomes
+
+    @staticmethod
+    def _normalized_hash(content: str) -> str:
+        normalized = content.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _source_needs_processing(self, source_id: str) -> bool:
+        """Return whether a Source is new or changed since its last pipeline run."""
+        row = self.conn.execute("SELECT path, content_hash, processed_at, pipeline_status FROM sources WHERE id = ?", (source_id,)).fetchone()
+        if not row or not row["processed_at"] or row["pipeline_status"] not in {"processed", "review"}:
+            return True
+        path = self.s.knowledge_root / row["path"]
+        if not path.exists():
+            # The source content is still represented by the imported hash.
+            return False
+        try:
+            current_hash = self._normalized_hash(path.read_text(encoding="utf-8"))
+        except OSError:
+            return True
+        return current_hash != row["content_hash"]
+
+    def _mark_sources_processed(self, source_ids: list[str], action: str, candidate: dict[str, Any]) -> None:
+        status = "review" if action in {"candidate", "conflict"} else "processed"
+        candidate_hash = hashlib.sha256(json.dumps(candidate, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        now = datetime.now().isoformat(timespec="seconds")
+        for source_id in source_ids:
+            self.conn.execute("UPDATE sources SET processed_at = ?, pipeline_status = ?, last_candidate_hash = ? WHERE id = ?", (now, status, candidate_hash, source_id))
 
     def _judge_candidate(self, candidate: dict[str, Any]) -> MemoryDecision:
         existing = self.retrieve_context(candidate["title"], limit=5)
@@ -453,9 +541,11 @@ class MemoryService:
                 decision = MemoryDecision.from_dict(payload)
                 if decision.action in {"update", "merge"} and not decision.target_memory_id:
                     raise ValueError("update/merge requires target_memory_id")
+                self._last_judge_mode = "ai"
                 return decision
             except (RuntimeError, ValueError, TypeError, json.JSONDecodeError):
                 pass
+        self._last_judge_mode = "local"
         if existing and self._similar(existing[0]["title"], candidate["title"]):
             return MemoryDecision("update", "发现相似长期记忆，追加候选内容", existing[0]["id"], 0.65, candidate.get("total_score", 0))
         if candidate.get("total_score", sum(candidate.get("score", {}).values())) < 12:
