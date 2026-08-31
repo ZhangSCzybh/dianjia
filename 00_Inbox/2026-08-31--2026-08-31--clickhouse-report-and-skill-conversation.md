@@ -1,0 +1,51 @@
+# 2026-08-31 ClickHouse 报表分析与查询技能优化
+
+## 对话范围
+
+本次对话围绕 Dianjia 的 ClickHouse 报表 SQL 分析、同环比日期口径，以及 `clickhouse-query` 技能优化和使用方式展开。原始 SQL 以附件形式提供，附件路径保留在各主题下。
+
+## 已验证的业务结论
+
+### 月环比日期口径
+
+当筛选单日 `2024-02-29` 但使用月环比指标时，系统按月份累计口径处理。本期是 2024-02-01 至 2024-02-29；由于 2 月比 1 月少日期，上期取 2024-01-01 至 2024-01-31 的整月数据，而不是只取 2024-01-29。指标字典的月环比特殊规则规定：本月比上月少时，本月最后一天对应上月整月数据。
+
+### ClickHouse SQL 报表查询
+
+在 `flowdata-ka` 集群执行了四类只读报表 SQL，均使用品牌 `10770`、日期 `2026-08-01` 至 `2026-08-31` 的过滤条件，并通过 `FINAL` 和多层维表关联完成报表口径：
+
+1. 商品零售明细：返回 290 行聚合结果；147 个订单 id、12 个门店、30 个 SPU、68 个 SKU。销售金额和数量按销售减退款后的净值计算，并按订单商品支付比例拆分。
+2. 零售支付明细：返回 401 行聚合结果；包含支付名称、销售渠道、导购和支付类型 101/110/118 的拆分。支付类型 101 为储值卡支付；礼品卡 110 使用礼品卡明细和折扣率进一步分摊。
+3. 零售商品销售成本：返回 393 行聚合结果；并行计算标准成本、综合成本和订单实际成本，以及三套毛利和毛利率。综合成本按总部/门店、SKU/SPU、月份和特殊门店规则选择成本来源。
+4. 全渠道销售统计：返回 38 个渠道与商品类目组合及 totals；外层仅按一级/二级/三级渠道和四级商品类目聚合，不是原始明细。一级渠道结果为线下门店和私域，电商本期无数据。
+
+四条报表 SQL 的共同注意点：销售指标使用净销售减退款；基础 KPI 金额会排除剔除商品；支付比例按 `order_id + sku_id + item_id` 计算，但部分主表关联只使用订单 id 和 item_id；订单标签过滤最终使用空标签条件；大量 `FINAL`、重复扫描和复杂 JOIN 会增加查询成本。
+
+### ClickHouse 查询技能优化
+
+`clickhouse-query` 技能已优化：
+
+- 支持 `--sql-file` 和 `--sql-stdin`，适合超长报表 SQL；
+- SQL 校验能区分字符串中的分号、单行注释和块注释；
+- 拒绝多语句和 SQL 内置 `FORMAT`，统一通过 `--format` 指定输出；
+- `--ping` 返回连接标记、ClickHouse 版本和服务端主机名；
+- 支持可选 `--require-https`；
+- 支持 gzip 响应和 `--summary` 执行摘要；
+- 账号本身已是只读权限，因此脚本不发送 `readonly`、`max_execution_time` 等服务端设置，只使用客户端 `--timeout`，优先保证连接和查询成功。
+
+常用方式：
+
+```bash
+python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py \
+  --cluster flowdata-ka --sql-file /absolute/path/query.sql \
+  --format JSON --timeout 180 --summary
+```
+
+当前技能测试 7/7 通过；`flowdata-ka` 和 `flowdata-normal` 的连接、短 SQL、SQL 文件和 stdin 查询均已验证成功。技能官方 quick_validate 因环境缺少 PyYAML 未运行，但 Python AST 和静态检查通过。
+
+## 原始附件
+
+- 商品零售明细 SQL：`/Users/zhangshichao/.codex/attachments/4ef5162f-e9db-4764-ae00-5e329c9acd04/pasted-text.txt`
+- 零售支付明细 SQL：`/Users/zhangshichao/.codex/attachments/16c023a2-b225-4993-9113-8096074ba738/pasted-text.txt`
+- 零售商品销售成本 SQL：`/Users/zhangshichao/.codex/attachments/6f266cf7-6cf1-4302-a193-ce3c140935a7/pasted-text.txt`
+- 全渠道销售统计 SQL：`/Users/zhangshichao/.codex/attachments/7e427401-d10f-4542-8db0-b009b9412a5b/pasted-text.txt`
