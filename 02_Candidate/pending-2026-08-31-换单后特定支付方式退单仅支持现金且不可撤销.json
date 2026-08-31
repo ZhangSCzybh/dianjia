@@ -1,0 +1,26 @@
+{
+  "title": "换单后特定支付方式退单仅支持现金且不可撤销",
+  "category": "Projects",
+  "subcategory": "退款限制",
+  "tags": [
+    "储值卡",
+    "京东聚合支付",
+    "现金退款",
+    "不可撤销"
+  ],
+  "summary": "储值卡或京东聚合支付换单后退单只能退现金，退单完成后不能撤销。",
+  "content": "使用储值卡或京东聚合支付（微信、支付宝、银联）收银的订单，在换单后执行退单时仅支持现金退款。任何退单一旦完成均不可撤销，提交前应核对退款商品、金额、理由、操作人和退款方式。",
+  "source_date": "2026-08-31",
+  "source_ids": [
+    "85786980-8e5f-4671-be7d-f98942b9cd1a",
+    "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
+  ],
+  "score": {
+    "reusability": 4,
+    "importance": 4,
+    "uniqueness": 4,
+    "stability": 4,
+    "personal_relevance": 4
+  },
+  "total_score": 20
+}

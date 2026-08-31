@@ -1,2 +1,0 @@
-# The MVP uses Python's standard library. Optional AI integrations can be added later.
-

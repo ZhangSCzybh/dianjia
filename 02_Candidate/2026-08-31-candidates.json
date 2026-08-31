@@ -1,26 +1,131 @@
 [
   {
-    "title": "ClickHouse 查询技能与只读查询规范",
-    "category": "SQL",
-    "subcategory": "查询与数据",
+    "title": "零售退单应区分关联原单与不关联原单模式",
+    "category": "Projects",
+    "subcategory": "零售售后",
     "tags": [
-      "clickhouse",
-      "sql",
-      "join"
+      "零售退单",
+      "订单退货",
+      "商品退货",
+      "原单关联"
     ],
-    "summary": "2026-08-31 ClickHouse 报表分析与查询技能优化",
-    "content": "# 2026-08-31 ClickHouse 报表分析与查询技能优化\n\n## 对话范围\n\n本次对话围绕 Dianjia 的 ClickHouse 报表 SQL 分析、同环比日期口径，以及 `clickhouse-query` 技能优化和使用方式展开。原始 SQL 以附件形式提供，附件路径保留在各主题下。\n\n## 已验证的业务结论\n\n### 月环比日期口径\n\n当筛选单日 `2024-02-29` 但使用月环比指标时，系统按月份累计口径处理。本期是 2024-02-01 至 2024-02-29；由于 2 月比 1 月少日期，上期取 2024-01-01 至 2024-01-31 的整月数据，而不是只取 2024-01-29。指标字典的月环比特殊规则规定：本月比上月少时，本月最后一天对应上月整月数据。\n\n### ClickHouse SQL 报表查询\n\n在 `flowdata-ka` 集群执行了四类只读报表 SQL，均使用品牌 `10770`、日期 `2026-08-01` 至 `2026-08-31` 的过滤条件，并通过 `FINAL` 和多层维表关联完成报表口径：\n\n1. 商品零售明细：返回 290 行聚合结果；147 个订单 id、12 个门店、30 个 SPU、68 个 SKU。销售金额和数量按销售减退款后的净值计算，并按订单商品支付比例拆分。\n2. 零售支付明细：返回 401 行聚合结果；包含支付名称、销售渠道、导购和支付类型 101/110/118 的拆分。支付类型 101 为储值卡支付；礼品卡 110 使用礼品卡明细和折扣率进一步分摊。\n3. 零售商品销售成本：返回 393 行聚合结果；并行计算标准成本、综合成本和订单实际成本，以及三套毛利和毛利率。综合成本按总部/门店、SKU/SPU、月份和特殊门店规则选择成本来源。\n4. 全渠道销售统计：返回 38 个渠道与商品类目组合及 totals；外层仅按一级/二级/三级渠道和四级商品类目聚合，不是原始明细。一级渠道结果为线下门店和私域，电商本期无数据。\n\n四条报表 SQL 的共同注意点：销售指标使用净销售减退款；基础 KPI 金额会排除剔除商品；支付比例按 `order_id + sku_id + item_id` 计算，但部分主表关联只使用订单 id 和 item_id；订单标签过滤最终使用空标签条件；大量 `FINAL`、重复扫描和复杂 JOIN 会增加查询成本。\n\n### ClickHouse 查询技能优化\n\n`clickhouse-query` 技能已优化：\n\n- 支持 `--sql-file` 和 `--sql-stdin`，适合超长报表 SQL；\n- SQL 校验能区分字符串中的分号、单行注释和块注释；\n- 拒绝多语句和 SQL 内置 `FORMAT`，统一通过 `--format` 指定输出；\n- `--ping` 返回连接标记、ClickHouse 版本和服务端主机名；\n- 支持可选 `--require-https`；\n- 支持 gzip 响应和 `--summary` 执行摘要；\n- 账号本身已是只读权限，因此脚本不发送 `readonly`、`max_execution_time` 等服务端设置，只使用客户端 `--timeout`，优先保证连接和查询成功。\n\n常用方式：\n\n```bash\npython3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py \\\n  --cluster flowdata-ka --sql-file /absolute/path/query.sql \\\n  --format JSON --timeout 180 --summary\n```\n\n当前技能测试 7/7 通过；`flowdata-ka` 和 `flowdata-normal` 的连接、短 SQL、SQL 文件和 stdin 查询均已验证成功。技能官方 quick_validate 因环境缺少 PyYAML 未运行，但 Python AST 和静态检查通过。\n\n## 原始附件\n\n- 商品零售明细 SQL：`/Users/zhangshichao/.codex/attachments/4ef5162f-e9db-4764-ae00-5e329c9acd04/pasted-text.txt`\n- 零售支付明细 SQL：`/Users/zhangshichao/.codex/attachments/16c023a2-b225-4993-9113-8096074ba738/pasted-text.txt`\n- 零售商品销售成本 SQL：`/Users/zhangshichao/.codex/attachments/6f266cf7-6cf1-4302-a193-ce3c140935a7/pasted-text.txt`\n- 全渠道销售统计 SQL：`/Users/zhangshichao/.codex/attachments/7e427401-d10f-4542-8db0-b009b9412a5b/pasted-text.txt`",
+    "summary": "订单退货关联原销售单，商品退货不关联原单，适用于老系统订单售后等场景。",
+    "content": "零售退单分为订单退货和商品退货。订单退货关联原销售单，可通过退单反查销售单，系统默认开放该模式。商品退货不关联原销售单，仅形成退款记录，通常用于系统切换初期处理老系统订单售后；使用前需在后台开启允许不关联原单退货。",
     "source_date": "2026-08-31",
     "source_ids": [
-      "23c0e7c3-e438-4db3-8ba7-79331ea6c250"
+      "85786980-8e5f-4671-be7d-f98942b9cd1a",
+      "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
     ],
     "score": {
-      "reusability": 3,
-      "importance": 3,
-      "uniqueness": 3,
-      "stability": 3,
-      "personal_relevance": 3
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 5,
+      "stability": 4,
+      "personal_relevance": 4
     },
-    "total_score": 15
+    "total_score": 22
+  },
+  {
+    "title": "零售退单需先查单再核对商品金额并选择退款方式",
+    "category": "Projects",
+    "subcategory": "操作流程",
+    "tags": [
+      "收银台",
+      "零售退单",
+      "订单查询",
+      "退款流程"
+    ],
+    "summary": "门店通过收银台进入零售退单，查询订单后核对退款商品和金额，再提交退款。",
+    "content": "操作路径为收银台 > 零售退单。订单可通过订单号、会员手机号、商品货号或SKU编码查询。确认订单后选择退款商品，核对商品与金额并提交，最后选择退款方式完成退单。退单改价仅在后台提前开放权限后可用。",
+    "source_date": "2026-08-31",
+    "source_ids": [
+      "85786980-8e5f-4671-be7d-f98942b9cd1a",
+      "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 21
+  },
+  {
+    "title": "退货业绩扣减规则取决于退货是否关联原单",
+    "category": "Projects",
+    "subcategory": "业绩与权益",
+    "tags": [
+      "业绩扣减",
+      "服务导购",
+      "会员权益",
+      "退货规则"
+    ],
+    "summary": "关联原单退货扣减原销售服务导购业绩并追回会员权益，不关联原单退货按所选导购及配置比例扣减。",
+    "content": "订单退货时，退货业绩扣减原销售订单中的服务导购，与当前退单操作人无关；原销售时产生的会员权益也会扣回。商品退货时，门店必须选择服务导购，所选导购承担业绩扣减，可多选，并按后台配置比例分摊扣减。",
+    "source_date": "2026-08-31",
+    "source_ids": [
+      "85786980-8e5f-4671-be7d-f98942b9cd1a",
+      "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 5,
+      "stability": 4,
+      "personal_relevance": 5
+    },
+    "total_score": 24
+  },
+  {
+    "title": "换单后特定支付方式退单仅支持现金且不可撤销",
+    "category": "Projects",
+    "subcategory": "退款限制",
+    "tags": [
+      "储值卡",
+      "京东聚合支付",
+      "现金退款",
+      "不可撤销"
+    ],
+    "summary": "储值卡或京东聚合支付换单后退单只能退现金，退单完成后不能撤销。",
+    "content": "使用储值卡或京东聚合支付（微信、支付宝、银联）收银的订单，在换单后执行退单时仅支持现金退款。任何退单一旦完成均不可撤销，提交前应核对退款商品、金额、理由、操作人和退款方式。",
+    "source_date": "2026-08-31",
+    "source_ids": [
+      "85786980-8e5f-4671-be7d-f98942b9cd1a",
+      "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 20
+  },
+  {
+    "title": "退款理由支持新增和修改并应纳入退单配置管理",
+    "category": "Projects",
+    "subcategory": "后台配置",
+    "tags": [
+      "退款理由",
+      "后台配置",
+      "退单管理"
+    ],
+    "summary": "退款理由不是固定值，后台支持新增和修改，门店退单时应选择适用理由。",
+    "content": "零售退单流程中需要选择退款理由。退款理由支持在后台新增和修改，配置调整后应与门店实际退单场景保持一致，并在提交退单前完成理由核对。",
+    "source_date": "2026-08-31",
+    "source_ids": [
+      "85786980-8e5f-4671-be7d-f98942b9cd1a",
+      "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 3,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 19
   }
 ]

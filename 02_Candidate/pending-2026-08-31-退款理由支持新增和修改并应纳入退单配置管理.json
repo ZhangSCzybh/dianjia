@@ -1,0 +1,25 @@
+{
+  "title": "退款理由支持新增和修改并应纳入退单配置管理",
+  "category": "Projects",
+  "subcategory": "后台配置",
+  "tags": [
+    "退款理由",
+    "后台配置",
+    "退单管理"
+  ],
+  "summary": "退款理由不是固定值，后台支持新增和修改，门店退单时应选择适用理由。",
+  "content": "零售退单流程中需要选择退款理由。退款理由支持在后台新增和修改，配置调整后应与门店实际退单场景保持一致，并在提交退单前完成理由核对。",
+  "source_date": "2026-08-31",
+  "source_ids": [
+    "85786980-8e5f-4671-be7d-f98942b9cd1a",
+    "969ef3d4-ad9d-4f27-95dd-c851598e68aa"
+  ],
+  "score": {
+    "reusability": 4,
+    "importance": 3,
+    "uniqueness": 4,
+    "stability": 4,
+    "personal_relevance": 4
+  },
+  "total_score": 19
+}

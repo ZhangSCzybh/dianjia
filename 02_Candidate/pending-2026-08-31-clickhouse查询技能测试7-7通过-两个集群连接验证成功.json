@@ -1,0 +1,26 @@
+{
+  "title": "ClickHouse查询技能测试7/7通过，两个集群连接验证成功",
+  "category": "Testing",
+  "subcategory": "技能验证",
+  "tags": [
+    "ClickHouse",
+    "测试",
+    "连接验证",
+    "flowdata-ka",
+    "flowdata-normal"
+  ],
+  "summary": "clickhouse-query技能测试7/7通过，flowdata-ka和flowdata-normal的连接、短SQL、SQL文件和stdin查询均验证成功；quick_validate因缺少PyYAML未运行。",
+  "content": "当前clickhouse-query技能测试7/7通过；flowdata-ka和flowdata-normal的连接、短SQL、SQL文件和stdin查询均已验证成功。技能官方quick_validate因环境缺少PyYAML未运行，但Python AST和静态检查通过。",
+  "source_date": "2026-08-31",
+  "source_ids": [
+    "23c0e7c3-e438-4db3-8ba7-79331ea6c250"
+  ],
+  "score": {
+    "reusability": 0,
+    "importance": 0,
+    "uniqueness": 0,
+    "stability": 0,
+    "personal_relevance": 0
+  },
+  "total_score": 0
+}

@@ -125,6 +125,8 @@ Extractor 只负责发现可能值得保存的知识，不决定最终归档操�
 | 17-20 | 适合长期记忆，交由 Judge 决定 create/update/merge |
 | 21-25 | 高价值核心记忆，仍需经过检索和 Judge |
 
+实现约束：`total_score` 始终由五项评分之和计算，不能使用 AI 单独返回的不一致总分。AI Judge 即使返回 `create`，当总分低于 12 时也会自动降级为 `candidate`，保留在候选区待复核，不直接写入长期记忆。
+
 ### 4. Retrieve
 
 每个 Candidate 先检索已有长期记忆，返回最多 Top 5：

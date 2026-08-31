@@ -1,2 +1,0 @@
-"""Dianjia AI memory MVP."""
-

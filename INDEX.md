@@ -14,6 +14,10 @@ Automatically generated from active Markdown memories.
 - [商品与组织档案维度字段](03_Memory/BI/商品与组织档案维度字段-ae182d46.md)
 - [商品成本计算](03_Memory/BI/指标计算/商品成本计算.md)
 - [商品销存 SPU 未销天数与店数合计规则](03_Memory/BI/商品销存-spu-未销天数与店数合计规则-8f50de91.md)
+- [商品预售单录入、支付与订货单生成规则](03_Memory/BI/商品预售单录入-支付与订货单生成规则-20ce94bc.md)
+- [商品预售单转销售单后退款规则](03_Memory/BI/商品预售单转销售单后退款规则-affd0b34.md)
+- [商场预售单操作及转销售单全流程规则](03_Memory/BI/商场预售单操作及转销售单全流程规则-ce56de43.md)
+- [四类ClickHouse报表SQL执行结果验证](03_Memory/BI/四类clickhouse报表sql执行结果验证-09f2a2a1.md)
 - [多维报表人数温度聚合与 Cube 别名规则](03_Memory/BI/多维报表人数温度聚合与-cube-别名规则-85bd09e1.md)
 - [报表中心属性更新频率：维度实时更新，属性15分钟延迟](03_Memory/BI/报表中心属性更新频率-维度实时更新-属性15分钟延迟-eeab916a.md)
 - [报表中心敏感字段权限与虚拟数据规则](03_Memory/BI/报表中心敏感字段权限与虚拟数据规则-ba830aac.md)
@@ -134,13 +138,16 @@ Automatically generated from active Markdown memories.
 - [费用分摊与净利润指标](03_Memory/BI/指标计算/费用分摊与净利润.md)
 - [进销存报表口径差异与性能来源](03_Memory/BI/进销存报表口径差异与性能来源-a5d5d3cd.md)
 - [进销存期初期末与在途指标](03_Memory/BI/进销存期初期末与在途指标-dad498c2.md)
+- [销售报表SQL口径：净销售减退款、支付比例拆分、空标签过滤](03_Memory/BI/销售报表sql口径-净销售减退款-支付比例拆分-空标签过滤-7a0413df.md)
 - [零售与预售报表支付方式拆分口径](03_Memory/BI/零售与预售报表支付方式拆分口径-36db8592.md)
 - [零售销售金额与单效指标](03_Memory/BI/零售销售金额与单效指标-4afffe09.md)
 
 ## Projects
 
+- [POS 收单流程与规则](03_Memory/Projects/pos-收单流程与规则-12965d4f.md)
 - [订单与预售状态码](03_Memory/Projects/BI/订单与预售状态码.md)
 - [订单支付预售与库存单据指标](03_Memory/Projects/订单支付预售与库存单据指标-6488e6a3.md)
+- [零售退单需先查单再核对商品金额并选择退款方式](03_Memory/Projects/零售退单需先查单再核对商品金额并选择退款方式-086a0497.md)
 
 ## SQL
 

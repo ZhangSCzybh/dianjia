@@ -1,0 +1,37 @@
+{
+  "date": "2026-08-31",
+  "source_ids": [
+    "23c0e7c3-e438-4db3-8ba7-79331ea6c250",
+    "9853667e-643f-46b2-aae6-005bbb5450cb"
+  ],
+  "completed": [
+    "验证月环比日期口径：筛选单日 2024-02-29 时，本期为 2024-02-01 至 2024-02-29，上期取 2024-01-01 至 2024-01-31 整月数据",
+    "在 flowdata-ka 集群执行四类只读报表 SQL：商品零售明细、零售支付明细、零售商品销售成本、全渠道销售统计",
+    "优化 clickhouse-query 技能：支持 --sql-file/--sql-stdin、SQL 校验、--ping、--require-https、gzip 响应和 --summary",
+    "测试 clickhouse-query 技能 7/7 通过，验证 flowdata-ka 和 flowdata-normal 连接及查询",
+    "整理 POS 收单流程与规则，包括录入商品、会员、优惠组合、付款收银、打印小票"
+  ],
+  "problems": [
+    "技能官方 quick_validate 因环境缺少 PyYAML 未运行",
+    "报表 SQL 大量使用 FINAL、重复扫描和复杂 JOIN，查询成本较高",
+    "部分主表关联只使用订单 id 和 item_id，支付比例按 order_id + sku_id + item_id 计算，存在口径不一致风险"
+  ],
+  "knowledge": [
+    "月环比特殊规则：本月比上月少时，本月最后一天对应上月整月数据",
+    "ClickHouse 报表 SQL 共同注意点：销售指标使用净销售减退款；基础 KPI 金额排除剔除商品；支付比例按 order_id + sku_id + item_id 计算；订单标签过滤最终使用空标签条件",
+    "clickhouse-query 技能支持 --sql-file 和 --sql-stdin，拒绝多语句和 SQL 内置 FORMAT，统一通过 --format 指定输出",
+    "账号本身只读权限，脚本不发送 readonly、max_execution_time 等服务端设置，只使用客户端 --timeout",
+    "POS 收单五步：录入商品、录入会员、处理优惠组合、提交订单收银、打印小票",
+    "商品录入四种方式：扫码枪、筛选器、手动输入 SKU、输入货号选择颜色尺寸",
+    "本店库存与可用库存区别：可用库存为门店联盟总库存，可共享",
+    "会员录入三种方式：手机号、微信会员卡卡号、会员识别码",
+    "优惠组合：系统自动选择最优组合，可手动设置单品折扣、积分抵扣、品牌优惠等",
+    "小票字段口径：吊牌、折扣、销售、数量、金额、优惠、实折、实付、总价、会员优惠"
+  ],
+  "projects": [
+    "clickhouse-query 技能优化",
+    "ClickHouse 报表分析",
+    "POS 收单流程梳理"
+  ],
+  "tomorrow": []
+}

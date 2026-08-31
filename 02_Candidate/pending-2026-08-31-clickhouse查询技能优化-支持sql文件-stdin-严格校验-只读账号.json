@@ -1,0 +1,27 @@
+{
+  "title": "ClickHouse查询技能优化：支持SQL文件/stdin、严格校验、只读账号",
+  "category": "Projects",
+  "subcategory": "工具技能",
+  "tags": [
+    "ClickHouse",
+    "查询技能",
+    "SQL文件",
+    "stdin",
+    "只读",
+    "校验"
+  ],
+  "summary": "clickhouse-query技能新增--sql-file/--sql-stdin、SQL校验区分注释和分号、拒绝多语句和内置FORMAT、支持--ping、--require-https、gzip响应和--summary；账号只读，脚本不发送服务端设置。",
+  "content": "clickhouse-query技能优化内容：支持--sql-file和--sql-stdin，适合超长报表SQL；SQL校验能区分字符串中的分号、单行注释和块注释；拒绝多语句和SQL内置FORMAT，统一通过--format指定输出；--ping返回连接标记、ClickHouse版本和服务端主机名；支持可选--require-https；支持gzip响应和--summary执行摘要。账号本身已是只读权限，因此脚本不发送readonly、max_execution_time等服务端设置，只使用客户端--timeout，优先保证连接和查询成功。常用命令：python3 /Users/zhangshichao/.codex/skills/clickhouse-query/scripts/query_clickhouse.py --cluster flowdata-ka --sql-file /absolute/path/query.sql --format JSON --timeout 180 --summary",
+  "source_date": "2026-08-31",
+  "source_ids": [
+    "23c0e7c3-e438-4db3-8ba7-79331ea6c250"
+  ],
+  "score": {
+    "reusability": 0,
+    "importance": 0,
+    "uniqueness": 0,
+    "stability": 0,
+    "personal_relevance": 0
+  },
+  "total_score": 1
+}
