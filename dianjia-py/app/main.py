@@ -43,7 +43,7 @@ def main() -> None:
     elif args.command == "ingest-dir": print("\n".join(str(path) for path in service.ingest_directory(args.directory, args.date)))
     elif args.command == "daily": print(service.daily(args.date))
     elif args.command == "extract" or (args.command == "memory" and args.memory_action == "extract"): print(service.extract(args.date))
-    elif args.command == "process" or (args.command == "memory" and args.memory_action == "process"): print("\n".join(service.process(args.candidate_file)))
+    elif args.command == "process" or (args.command == "memory" and args.memory_action == "process"): print("\n".join(outcome.cli_text() for outcome in service.process(args.candidate_file)))
     elif args.command == "search":
         for row in service.search(args.keyword, args.limit): print(f"{row['id']}\t{row['title']}\t{row['path']}")
     elif args.command == "ask":
@@ -58,7 +58,7 @@ def main() -> None:
                 print("\n参考记忆：")
                 for memory in memories: print(f"- {memory['title']} ({memory['path']})")
     elif args.command == "show": print(service.show(args.memory_id))
-    elif args.command == "run-daily": print("\n".join(service.run_daily(args.date)))
+    elif args.command == "run-daily": print("\n".join(outcome.cli_text() for outcome in service.run_daily(args.date)))
     elif args.command == "rebuild-index": print(f"Indexed {service.rebuild_index()} memories")
     elif args.command == "migrate-legacy":
         from .migration import migrate_legacy_memories

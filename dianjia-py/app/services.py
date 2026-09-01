@@ -5,6 +5,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 import uuid
 from datetime import date, datetime
 from pathlib import Path
@@ -14,7 +15,10 @@ from .config import Settings
 from .database import connect
 from .markdown import dump_frontmatter, parse_frontmatter, slugify
 from .ai.client import AIClient
-from .models import MemoryDecision, Source
+from .models import MemoryDecision, ProcessOutcome, Source
+
+
+DEFAULT_CATEGORIES = ("SQL", "BI", "Testing", "AI", "Projects", "General")
 
 
 class MemoryService:
@@ -82,7 +86,7 @@ class MemoryService:
                 paths.append(self.ingest(source, source_date or (match.group(1) if match else None)))
         return paths
 
-    def run_daily(self, day: str | None = None) -> list[str]:
+    def run_daily(self, day: str | None = None) -> list[ProcessOutcome]:
         """Run the complete offline daily pipeline in one command."""
         self.daily(day)
         candidate = self.extract(day)
@@ -166,8 +170,11 @@ class MemoryService:
         if ai.enabled:
             try:
                 prompt_body = self._truncate_for_ai(body)
-                payload = self._json_response(ai.ask([{"role": "system", "content": "你是长期记忆提取器。只输出 JSON 数组。按每个独立、可复用的主题合并内容，不要把日报小标题（如支持、推荐组合、项目进展）单独当作记忆；每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score。title 要具体描述问题或规则（10-40 字），category 优先使用 SQL、BI、Testing、AI、Projects，无法判断才用 General。只提取稳定且可复用的知识。score 必须是五项 0-5 的整数：reusability 表示未来重复使用价值，importance 表示对业务或项目的影响，uniqueness 表示现有记忆中不重复的程度，stability 表示长期有效性，personal_relevance 表示对用户工作的重要性。临时查询结果、单次执行行数和当天状态通常 stability 不超过 1；可验证的通用规则、字段口径和工具操作规范通常 reusability/importance/stability 至少为 3。total_score 必须严格等于五项 score 之和（0-25），不要自行填写不一致的总分。"}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": prompt_body}, ensure_ascii=False)}]))
-                candidates = [self._normalize_candidate(item, day, summary.get("source_ids", [])) for item in payload]
+                category_catalog = self._category_catalog()
+                catalog_text = "、".join(category_catalog)
+                prompt = f"你是长期记忆提取器。只输出 JSON 数组。按每个独立、可复用的主题合并内容，不要把日报小标题（如支持、推荐组合、项目进展）单独当作记忆；每项必须包含 title、category、subcategory、tags、summary、content、source_date、source_ids、score、total_score、category_action、category_reason、category_confidence。title 要具体描述问题或规则（10-40 字）。现有分类目录为：{catalog_text}。category_action 必须是 existing 或 new：优先从现有分类目录精确选择 existing；只有没有任何已有分类准确覆盖主题时才能选择 new。new 的 category 必须是简短、具体的一级分类名称，不能是已有分类的近义重复。category_reason 说明分类理由，category_confidence 是 0 到 1 的数字。只提取稳定且可复用的知识。score 必须是五项 0-5 的整数：reusability 表示未来重复使用价值，importance 表示对业务或项目的影响，uniqueness 表示现有记忆中不重复的程度，stability 表示长期有效性，personal_relevance 表示对用户工作的重要性。临时查询结果、单次执行行数和当天状态通常 stability 不超过 1；可验证的通用规则、字段口径和工具操作规范通常 reusability/importance/stability 至少为 3。total_score 必须严格等于五项 score 之和（0-25），不要自行填写不一致的总分。"
+                payload = self._json_response(ai.ask([{"role": "system", "content": prompt}, {"role": "user", "content": json.dumps({"date": day, "summary": summary, "markdown": prompt_body}, ensure_ascii=False)}]))
+                candidates = [self._normalize_candidate(item, day, summary.get("source_ids", []), category_catalog=category_catalog) for item in payload]
                 ai_extracted = True
                 self._last_extract_mode = "ai"
                 print("[extract] 使用 AI 提取候选", file=sys.stderr)
@@ -196,7 +203,7 @@ class MemoryService:
                 continue
             title = cls._fallback_title(content)
             category, subcategory, tags = cls._classify_content(content)
-            candidate = {"title": title, "category": category, "subcategory": subcategory, "tags": tags, "summary": cls._fallback_summary(content), "content": content[:16000], "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}}
+            candidate = {"title": title, "category": category, "subcategory": subcategory, "tags": tags, "summary": cls._fallback_summary(content), "content": content[:16000], "score": {"reusability": 3, "importance": 3, "uniqueness": 3, "stability": 3, "personal_relevance": 3}, "category_action": "local_fallback", "category_reason": "AI 不可用，按本地关键词规则分类", "category_confidence": None}
             candidates.append(cls._normalize_candidate(candidate, day, source_ids))
         return candidates
 
@@ -257,21 +264,90 @@ class MemoryService:
         return json.loads(cleaned)
 
     @staticmethod
-    def _normalize_candidate(item: dict[str, Any], day: str, source_ids: list[str]) -> dict[str, Any]:
+    def _normalize_category_name(value: Any) -> str | None:
+        raw_name = str(value or "")
+        if any(unicodedata.category(char).startswith("C") for char in raw_name):
+            return None
+        name = " ".join(raw_name.strip().split())
+        if not name or name in {".", ".."} or len(name) > 40 or ".." in name or any(char in name for char in "/\\"):
+            return None
+        return name
+
+    @classmethod
+    def _category_match(cls, value: Any, category_catalog: list[str]) -> str | None:
+        name = cls._normalize_category_name(value)
+        if not name:
+            return None
+        return next((category for category in category_catalog if category.casefold() == name.casefold()), None)
+
+    def _category_catalog(self) -> list[str]:
+        """Return default and already-established categories in stable order."""
+        seen: set[str] = set()
+        catalog: list[str] = []
+
+        def add(value: Any) -> None:
+            name = self._normalize_category_name(value)
+            if name and name.casefold() not in seen:
+                seen.add(name.casefold())
+                catalog.append(name)
+
+        for category in DEFAULT_CATEGORIES:
+            add(category)
+        memory_root = self.s.knowledge_root / "03_Memory"
+        if memory_root.exists():
+            for path in sorted(memory_root.iterdir(), key=lambda item: item.name.casefold()):
+                if path.is_dir():
+                    add(path.name)
+        for row in self.conn.execute("SELECT DISTINCT category FROM memories WHERE status = 'active' ORDER BY category"):
+            add(row["category"])
+        return catalog
+
+    @classmethod
+    def _normalize_candidate(cls, item: dict[str, Any], day: str, source_ids: list[str], *, category_catalog: list[str] | None = None) -> dict[str, Any]:
         if not isinstance(item, dict) or not str(item.get("title", "")).strip() or not str(item.get("content", "")).strip():
             raise ValueError("candidate title/content is required")
         content = str(item["content"]).strip()
         title = str(item["title"]).strip()
         if title in {"支持", "不支持或存在风险", "推荐组合", "解决方案", "知识沉淀", "项目进展"} or len(title) < 4:
-            title = MemoryService._fallback_title(content)
-        category = str(item.get("category") or "General")
-        if category not in {"SQL", "BI", "Testing", "AI", "Projects", "General"}:
-            category = "General"
+            title = cls._fallback_title(content)
+        category_catalog = [category for category in (category_catalog or list(DEFAULT_CATEGORIES)) if cls._normalize_category_name(category)]
+        category = cls._normalize_category_name(item.get("category"))
+        action = str(item.get("category_action") or "legacy").strip().lower()
+        reason = str(item.get("category_reason") or "").strip()
+        confidence: float | None = None
+        if action in {"existing", "new"}:
+            try:
+                confidence = float(item.get("category_confidence"))
+            except (TypeError, ValueError):
+                action = "local_fallback"
+            else:
+                if not 0 <= confidence <= 1:
+                    action = "local_fallback"
+        if action == "existing":
+            category = cls._category_match(category, category_catalog)
+            if not category:
+                action = "local_fallback"
+        elif action == "new":
+            if not category:
+                action = "local_fallback"
+            else:
+                category = cls._category_match(category, category_catalog) or category
+                if cls._category_match(category, category_catalog):
+                    action = "existing"
+        elif action == "legacy":
+            category = cls._category_match(category, category_catalog)
+            if not category:
+                action = "local_fallback"
+        elif action != "local_fallback":
+            action = "local_fallback"
         subcategory = item.get("subcategory")
-        if category == "General":
-            inferred, inferred_subcategory, inferred_tags = MemoryService._classify_content(content)
+        if action == "local_fallback" or category == "General":
+            inferred, inferred_subcategory, inferred_tags = cls._classify_content(content)
+            category = inferred
+            action = "local_fallback"
+            reason = reason or "AI 分类无效，按本地关键词规则分类"
             if inferred != "General":
-                category, subcategory = inferred, subcategory or inferred_subcategory
+                subcategory = subcategory or inferred_subcategory
                 if not item.get("tags"):
                     item = {**item, "tags": inferred_tags}
         score = item.get("score") if isinstance(item.get("score"), dict) else {}
@@ -280,7 +356,7 @@ class MemoryService:
         # returns a stale or invented total_score (for example, five zeros and
         # total_score=1); recomputing prevents inconsistent routing decisions.
         total_score = sum(score.values())
-        return {"title": title, "category": category, "subcategory": subcategory, "tags": [str(x) for x in (item.get("tags") or [])], "summary": str(item.get("summary") or content[:240]), "content": content, "source_date": day, "source_ids": [str(x) for x in (item.get("source_ids") or source_ids)], "score": score, "total_score": total_score}
+        return {"title": title, "category": category, "subcategory": subcategory, "tags": [str(x) for x in (item.get("tags") or [])], "summary": str(item.get("summary") or content[:240]), "content": content, "source_date": day, "source_ids": [str(x) for x in (item.get("source_ids") or source_ids)], "score": score, "total_score": total_score, "category_action": action, "category_reason": reason, "category_confidence": confidence}
 
     def search(self, keyword: str, limit: int = 10):
         """Search active memory metadata and Markdown bodies.
@@ -449,7 +525,7 @@ class MemoryService:
             raise FileNotFoundError(path)
         return path.read_text(encoding="utf-8")
 
-    def process(self, candidate_file: Path | None = None, *, skip_processed_sources: bool = False) -> list[str]:
+    def process(self, candidate_file: Path | None = None, *, skip_processed_sources: bool = False) -> list[ProcessOutcome]:
         self.init()
         if candidate_file is None:
             files = sorted((self.s.knowledge_root / "02_Candidate").glob("*-candidates.json"))
@@ -457,7 +533,7 @@ class MemoryService:
         elif not candidate_file.exists():
             candidate_file = self.s.knowledge_root / "02_Candidate" / candidate_file
         candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
-        outcomes = []
+        outcomes: list[ProcessOutcome] = []
         judge_ai_count = 0
         judge_local_count = 0
         skipped_count = 0
@@ -481,22 +557,27 @@ class MemoryService:
             else:
                 judge_local_count += 1
             action = decision.action
-            memory_id = decision.target_memory_id
+            # A decision target is only meaningful after a successful write.
+            # Candidate/conflict/discard results must not expose or audit an
+            # arbitrary model-provided target id.
+            memory_id = None
+            reason = decision.reason
             if action == "create":
                 memory_id = self._create_memory(candidate)
             elif action in {"update", "merge"}:
-                if not memory_id or not self.conn.execute("SELECT 1 FROM memories WHERE id = ?", (memory_id,)).fetchone():
-                    action, memory_id = "candidate", None
+                target_memory_id = decision.target_memory_id
+                if not target_memory_id or not self.conn.execute("SELECT 1 FROM memories WHERE id = ?", (target_memory_id,)).fetchone():
+                    action = "candidate"
+                    reason = f"{decision.reason}；指定的目标记忆不存在，已转为待确认候选"
                 else:
+                    memory_id = target_memory_id
                     self._update_memory(memory_id, candidate, decision, merge=(action == "merge"))
+            if action == "candidate":
+                self._save_special_candidate(candidate, "pending")
             elif action == "conflict":
                 self._save_special_candidate(candidate, "conflicts")
-            elif action == "candidate":
-                self._save_special_candidate(candidate, "pending")
-            elif action == "discard":
-                pass
-            audit_payload = {"candidate": candidate, "decision": {"action": decision.action, "target_memory_id": decision.target_memory_id, "confidence": decision.confidence, "total_score": decision.total_score, "changes": decision.changes, "merge_memory_ids": decision.merge_memory_ids}}
-            self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, decision.reason, json.dumps(audit_payload, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
+            audit_payload = {"candidate": candidate, "decision": {"action": action, "target_memory_id": memory_id, "confidence": decision.confidence, "total_score": decision.total_score, "changes": decision.changes, "merge_memory_ids": decision.merge_memory_ids}}
+            self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, reason, json.dumps(audit_payload, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
             if memory_id and candidate_source_ids:
                 for source_id in candidate_source_ids:
                     # Older databases do not have a uniqueness constraint on
@@ -510,7 +591,7 @@ class MemoryService:
             if candidate_source_ids:
                 self._mark_sources_processed(candidate_source_ids, action, candidate)
             self.conn.commit()
-            outcomes.append(f"{action}: {candidate['title']}")
+            outcomes.append(ProcessOutcome(action, candidate["title"], reason, self._last_judge_mode, memory_id))
         if candidates:
             print(f"[judge] AI 决策 {judge_ai_count} 条，本地规则 {judge_local_count} 条", file=sys.stderr)
         self._last_judge_counts = {"ai": judge_ai_count, "local": judge_local_count}
@@ -600,12 +681,15 @@ class MemoryService:
         return MemoryDecision("create", "未发现相似记忆且候选具有复用价值", None, 0.65, candidate.get("total_score", 0))
 
     def _create_memory(self, candidate: dict[str, Any]) -> str:
+        category = self._normalize_category_name(candidate.get("category"))
+        if not category:
+            raise ValueError("invalid category")
         memory_id = f"{slugify(candidate['title'])}-{uuid.uuid4().hex[:8]}"
-        rel = Path("03_Memory") / candidate.get("category", "General") / f"{memory_id}.md"
+        rel = Path("03_Memory") / category / f"{memory_id}.md"
         target = self.s.knowledge_root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         now = candidate["source_date"]
-        meta = {"id": memory_id, "title": candidate["title"], "category": candidate.get("category", "General"), "subcategory": candidate.get("subcategory") or "", "tags": candidate.get("tags", []), "summary": candidate.get("summary", ""), "status": "active", "memory_level": "long_term", "score": candidate.get("total_score", sum(candidate.get("score", {}).values())), "created_at": now, "updated_at": now, "source_dates": [now]}
+        meta = {"id": memory_id, "title": candidate["title"], "category": category, "subcategory": candidate.get("subcategory") or "", "tags": candidate.get("tags", []), "summary": candidate.get("summary", ""), "status": "active", "memory_level": "long_term", "score": candidate.get("total_score", sum(candidate.get("score", {}).values())), "created_at": now, "updated_at": now, "source_dates": [now]}
         target.write_text(dump_frontmatter(meta, f"# {candidate['title']}\n\n{candidate['content']}"), encoding="utf-8")
         self._upsert_meta(meta, rel.as_posix(), now)
         return memory_id

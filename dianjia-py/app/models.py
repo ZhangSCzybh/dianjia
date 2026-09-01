@@ -58,3 +58,24 @@ class MemoryDecision:
             merge_ids = [merge_ids]
         return cls(action, str(payload.get("reason", "")), str(target) if target else None, confidence, total, payload.get("changes") or {}, [str(x) for x in merge_ids])
 
+
+@dataclass(frozen=True)
+class ProcessOutcome:
+    """One completed candidate decision, ready for CLI and web presentation."""
+
+    action: str
+    title: str
+    reason: str
+    mode: str
+    memory_id: str | None = None
+
+    @property
+    def summary(self) -> str:
+        return f"{self.action}: {self.title}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"action": self.action, "title": self.title, "reason": self.reason, "mode": self.mode, "memory_id": self.memory_id}
+
+    def cli_text(self) -> str:
+        judge = "AI Judge" if self.mode == "ai" else "本地规则"
+        return f"{self.summary}\n  {judge} 理由：{self.reason or '未提供理由'}"

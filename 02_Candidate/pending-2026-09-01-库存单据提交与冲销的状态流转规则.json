@@ -1,0 +1,29 @@
+{
+  "title": "库存单据提交与冲销的状态流转规则",
+  "category": "Workflow",
+  "subcategory": "单据生命周期",
+  "tags": [
+    "库存",
+    "单据状态",
+    "提交",
+    "审批",
+    "冲销"
+  ],
+  "summary": "库存单据从创建、审批到提交或冲销具有固定状态语义；提交会产生库存变化，冲销会恢复库存。",
+  "content": "单据状态包括未提交、待审批、部分提交、已提交、已作废和已冲销。未提交表示单据已创建但未产生库存变化；待审批表示已提交等待审核，审核通过后变为已提交，驳回后回到未提交；部分提交表示部分商品已提交并已产生对应库存变化；已提交表示整单提交并产生库存变化；已作废用于弃用未提交单据；已冲销用于弃用已提交单据，冲销后库存恢复。",
+  "source_date": "2026-09-01",
+  "source_ids": [
+    "f0258bed-3a5d-4d18-9a1b-d84161e284a7"
+  ],
+  "score": {
+    "reusability": 5,
+    "importance": 5,
+    "uniqueness": 4,
+    "stability": 5,
+    "personal_relevance": 5
+  },
+  "total_score": 24,
+  "category_action": "existing",
+  "category_reason": "内容定义了库存业务单据的处理流程和状态转换规则。",
+  "category_confidence": 0.95
+}

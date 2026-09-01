@@ -1,19 +1,17 @@
 {
   "date": "2026-09-01",
   "source_ids": [
-    "a4bc0022-2eea-4f0b-89b9-a9f5b762c5d6",
-    "0d1e5c95-4ea3-4b9b-b87e-28f220cb39af",
-    "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    "f0258bed-3a5d-4d18-9a1b-d84161e284a7"
   ],
   "completed": [
-    "SELECT formatDateTime(bill_date,'%Y-%m-%d') as billDate,name_st as nameSt,code_st as codeSt,channel_name_new as channelNameNew,channel_code_new as channelCodeNew,bill_type_desc as billTypeDesc,bill_co",
-    "补货申请单",
-    "一、库存查询"
+    "获取并整理《单据状态解释》页面内容。"
   ],
   "problems": [],
-  "knowledge": [],
+  "knowledge": [
+    "单据状态涵盖未提交、待审批、部分提交、已提交、已作废和已冲销；提交与冲销会影响库存。",
+    "配货、调拨、退货等指令型单据可按出入库进度处于未出库、全部或差异出库、全部或差异入库及已完结状态。",
+    "单据编号前缀用于标识业务类型；以CX结尾表示冲销单据，以CY结尾表示差异单产生的库存调整单据。"
+  ],
   "projects": [],
-  "tomorrow": [
-    "根据今日记录补充后续行动"
-  ]
+  "tomorrow": []
 }

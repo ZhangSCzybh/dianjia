@@ -87,6 +87,8 @@ python main.py memory process 2026-08-28-candidates.json
 - `memory process [候选文件]`：对候选检索已有记忆并执行决策。省略文件名时处理最近生成的候选文件。
 - `extract`、`process`：分别是 `memory extract`、`memory process` 的兼容简写。
 
+提取阶段会把 `03_Memory` 中已有的一级分类提供给 AI，要求优先复用；仅当不存在合适分类时，AI 才能建议新分类。新分类不会因候选生成而立即创建，只有候选最终被 Judge 判定为 `create` 时才会出现在 `03_Memory/<分类>/`。AI 不可用或分类输出无效时，会继续使用内置的关键词分类规则。手动移动或重命名分类目录后，请运行 `python main.py rebuild-index` 同步索引。
+
 ```bash
 python main.py run-daily --date 2026-08-28
 ```

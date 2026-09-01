@@ -19,6 +19,10 @@ RUN_JOBS_LOCK = threading.Lock()
 MAX_WEB_INPUT_CHARS = 100_000
 
 
+def _outcome_payload(outcomes) -> dict:
+    return {"outcomes": [outcome.summary for outcome in outcomes], "decisions": [outcome.to_dict() for outcome in outcomes]}
+
+
 def _run_daily_job(job_id: str, day: str | None) -> None:
     try:
         outcomes = Handler.service.run_daily(day)
@@ -28,7 +32,7 @@ def _run_daily_job(job_id: str, day: str | None) -> None:
             RUN_JOBS[job_id] = {"status": "failed", "error": str(exc)}
     else:
         with RUN_JOBS_LOCK:
-            RUN_JOBS[job_id] = {"status": "completed", "outcomes": outcomes, "pipeline": Handler.service.pipeline_report()}
+            RUN_JOBS[job_id] = {"status": "completed", **_outcome_payload(outcomes), "pipeline": Handler.service.pipeline_report()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -88,7 +92,8 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/process":
                 payload = self._json()
                 candidate = payload.get("candidate_file")
-                self._send({"outcomes": self.service.process(Path(candidate) if candidate else None), "pipeline": self.service.pipeline_report()})
+                outcomes = self.service.process(Path(candidate) if candidate else None)
+                self._send({**_outcome_payload(outcomes), "pipeline": self.service.pipeline_report()})
             elif self.path == "/api/run-daily":
                 payload = self._json()
                 job_id = uuid.uuid4().hex

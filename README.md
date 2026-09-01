@@ -26,7 +26,7 @@ dianjia/
 └── INDEX.md         自动生成的知识导航
 ```
 
-`03_Memory` 按一级分类组织，例如 `SQL`、`BI`、`Testing`、`AI`、`Projects`。可以增加新分类，但分类名应稳定、明确，并避免同义目录重复。
+`03_Memory` 按一级分类组织，例如 `SQL`、`BI`、`Testing`、`AI`、`Projects`。AI 提取候选时会优先复用已有分类；只有没有合适分类时才建议新分类。新分类仅在候选最终执行 `create`、写入长期记忆时才会正式创建目录。AI 不可用时，程序仍按内置关键词规则分类。分类名应稳定、明确，并避免同义目录重复。
 
 ## 完整数据流
 
@@ -103,6 +103,9 @@ Extractor 只负责发现可能值得保存的知识，不决定最终归档操�
   "content": "",
   "source_date": "",
   "source_ids": [],
+  "category_action": "existing",
+  "category_reason": "",
+  "category_confidence": 0.0,
   "score": {
     "reusability": 0,
     "importance": 0,
@@ -114,7 +117,7 @@ Extractor 只负责发现可能值得保存的知识，不决定最终归档操�
 }
 ```
 
-候选文件保存为 `02_Candidate/YYYY-MM-DD-candidates.json`。候选评分用于判断和排序，不代表 AI 可以绕过 Judge 直接写入长期记忆。
+候选文件保存为 `02_Candidate/YYYY-MM-DD-candidates.json`。`category_action` 为 `existing` 时必须复用已有分类；为 `new` 时表示 AI 建议的新分类，Python 会校验名称安全性，并且只在最终 `create` 时创建对应目录。`local_fallback` 表示 AI 不可用或分类输出无效后，已使用本地关键词规则。候选评分用于判断和排序，不代表 AI 可以绕过 Judge 直接写入长期记忆。
 
 评分规则：
 

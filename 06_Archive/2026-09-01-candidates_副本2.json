@@ -1,0 +1,90 @@
+[
+  {
+    "title": "库存单据提交与冲销的状态流转规则",
+    "category": "Workflow",
+    "subcategory": "单据生命周期",
+    "tags": [
+      "库存",
+      "单据状态",
+      "提交",
+      "审批",
+      "冲销"
+    ],
+    "summary": "库存单据从创建、审批到提交或冲销具有固定状态语义；提交会产生库存变化，冲销会恢复库存。",
+    "content": "单据状态包括未提交、待审批、部分提交、已提交、已作废和已冲销。未提交表示单据已创建但未产生库存变化；待审批表示已提交等待审核，审核通过后变为已提交，驳回后回到未提交；部分提交表示部分商品已提交并已产生对应库存变化；已提交表示整单提交并产生库存变化；已作废用于弃用未提交单据；已冲销用于弃用已提交单据，冲销后库存恢复。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f0258bed-3a5d-4d18-9a1b-d84161e284a7"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "内容定义了库存业务单据的处理流程和状态转换规则。",
+    "category_confidence": 0.95
+  },
+  {
+    "title": "配货调拨退货指令型单据的出入库状态",
+    "category": "Workflow",
+    "subcategory": "指令单执行进度",
+    "tags": [
+      "配货",
+      "调拨",
+      "退货",
+      "出库",
+      "入库",
+      "单据状态"
+    ],
+    "summary": "配货、调拨和退货等指令型单据应按出库和入库进度区分执行状态。",
+    "content": "配货、调拨、退货等指令型单据的数据状态包括：已提交未出库、全部出库且未入库、差异出库且未入库、全部出库且全部入库、全部出库且差异入库，以及已完结。该状态体系用于识别指令单从提交到出库、入库和最终完结的执行进度及差异情况。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f0258bed-3a5d-4d18-9a1b-d84161e284a7"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 20,
+    "category_action": "existing",
+    "category_reason": "内容描述指令型库存单据的业务执行流程和进度口径。",
+    "category_confidence": 0.94
+  },
+  {
+    "title": "库存业务单据编号前缀与后缀识别规则",
+    "category": "Workflow",
+    "subcategory": "单据编码规范",
+    "tags": [
+      "单据编号",
+      "库存",
+      "冲销",
+      "差异单",
+      "编码规则"
+    ],
+    "summary": "单据编号前缀标识业务类型，特定后缀可识别冲销单据和差异库存调整单据。",
+    "content": "常用单据编号前缀包括：CK 出库单、RK 入库单、CJ 采购计划单、CG 采购订单、RKT 采购入库通知、CT 采购退货、CGTZ 采购调整、PD 盘点、TZ 库存调整、PH 配货、DB 调拨、CY 差异、THSQ 退货申请、TH 退货、DDSQ 订/补货申请、DH 订货、DHTZ 订货调整、ZX 装箱、CX 拆箱、PJ 商品/快速/订货配货、DJ 快速调拨、QCKC 期初库存导入。编号以 CX 结尾表示由冲销产生的单据；以 CY 结尾表示提交差异单后产生的库存调整单据。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f0258bed-3a5d-4d18-9a1b-d84161e284a7"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 23,
+    "category_action": "existing",
+    "category_reason": "内容是库存业务单据的编码识别规范，适合归入业务工作流知识。",
+    "category_confidence": 0.92
+  }
+]

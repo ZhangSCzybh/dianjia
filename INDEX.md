@@ -176,3 +176,8 @@ Automatically generated from active Markdown memories.
 
 - [储值卡不得用于储值卡充值以阻断余额循环](03_Memory/Testing/储值卡不得用于储值卡充值以阻断余额循环-3eb354a5.md)
 - [店家数仓销售报表测试](03_Memory/Testing/测试方法/店家数仓销售报表测试.md)
+
+## Workflow
+
+- [库存业务单据编号前缀与后缀识别规则](03_Memory/Workflow/库存业务单据编号前缀与后缀识别规则-0590aba1.md)
+- [配货调拨退货指令型单据的出入库状态](03_Memory/Workflow/配货调拨退货指令型单据的出入库状态-ab1f70a1.md)
