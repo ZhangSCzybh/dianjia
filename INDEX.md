@@ -11,6 +11,8 @@ Automatically generated from active Markdown memories.
 - [会员分类与单效指标](03_Memory/BI/指标计算/会员分类与单效指标.md)
 - [会员报表礼品卡余额统计范围](03_Memory/BI/会员报表礼品卡余额统计范围-7a39ea8a.md)
 - [会员销售与新老会员指标](03_Memory/BI/会员销售与新老会员指标-8c6078d0.md)
+- [储值卡账单按门店、员工和明细三层核对](03_Memory/BI/储值卡账单按门店-员工和明细三层核对-0df8dab1.md)
+- [储值异常应按金额、人员、明细、后台规则逐级排查](03_Memory/BI/储值异常应按金额-人员-明细-后台规则逐级排查-83aacca6.md)
 - [商品与组织档案维度字段](03_Memory/BI/商品与组织档案维度字段-ae182d46.md)
 - [商品成本计算](03_Memory/BI/指标计算/商品成本计算.md)
 - [商品销存 SPU 未销天数与店数合计规则](03_Memory/BI/商品销存-spu-未销天数与店数合计规则-8f50de91.md)
@@ -147,7 +149,9 @@ Automatically generated from active Markdown memories.
 ## Projects
 
 - [POS 收单流程与规则](03_Memory/Projects/pos-收单流程与规则-12965d4f.md)
+- [储值卡充值由联盟、预选项、赠送规则和员工状态共同约束](03_Memory/Projects/储值卡充值由联盟-预选项-赠送规则和员工状态共同约束-19714a7c.md)
 - [全盘部分盘及商品类型范围规则](03_Memory/Projects/全盘部分盘及商品类型范围规则-a7cc96b2.md)
+- [实物充值赠品必须绑定本店可用SKU](03_Memory/Projects/实物充值赠品必须绑定本店可用sku-2fda6104.md)
 - [异款换货按退货加购买并限制积分抵扣](03_Memory/Projects/异款换货按退货加购买并限制积分抵扣-0c0f1423.md)
 - [盘点前准备与分区盘点组织方法](03_Memory/Projects/盘点前准备与分区盘点组织方法-f039186b.md)
 - [盘点单作废冲销与提交规则](03_Memory/Projects/盘点单作废冲销与提交规则-bd9fdfdf.md)
@@ -170,4 +174,5 @@ Automatically generated from active Markdown memories.
 
 ## Testing
 
+- [储值卡不得用于储值卡充值以阻断余额循环](03_Memory/Testing/储值卡不得用于储值卡充值以阻断余额循环-3eb354a5.md)
 - [店家数仓销售报表测试](03_Memory/Testing/测试方法/店家数仓销售报表测试.md)
