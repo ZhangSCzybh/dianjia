@@ -658,6 +658,7 @@ class MemoryService:
 
     def rebuild_index(self) -> int:
         count = 0
+        indexed_ids: set[str] = set()
         for path in (self.s.knowledge_root / "03_Memory").rglob("*.md"):
             text = path.read_text(encoding="utf-8")
             meta, body = parse_frontmatter(text)
@@ -668,7 +669,17 @@ class MemoryService:
                 category_match = re.search(r"一级分类[：:]\s*([^\n*]+)", body)
                 meta = {"id": id_match.group(1) if id_match else slugify(path.stem), "title": title_match.group(1).strip() if title_match else path.stem, "category": category_match.group(1).strip() if category_match else path.parent.name, "summary": "", "tags": [], "status": "active", "memory_level": "long_term", "created_at": date.today().isoformat(), "updated_at": date.today().isoformat(), "score": 0}
             self._upsert_meta(meta, path.relative_to(self.s.knowledge_root).as_posix(), meta.get("updated_at", date.today().isoformat()))
+            indexed_ids.add(str(meta["id"]))
             count += 1
+        # Markdown is the source of truth. Memories removed from 03_Memory
+        # must leave the active index while remaining auditable in SQLite.
+        if indexed_ids:
+            placeholders = ",".join("?" for _ in indexed_ids)
+            self.conn.execute(
+                f"UPDATE memories SET status = 'archived', updated_at = ? WHERE status = 'active' AND id NOT IN ({placeholders})",
+                (date.today().isoformat(), *sorted(indexed_ids)),
+            )
+            self.conn.commit()
         self._write_index()
         return count
 

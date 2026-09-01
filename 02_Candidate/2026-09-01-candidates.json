@@ -1,208 +1,50 @@
 [
   {
-    "title": "库存字段口径及库存推导关系",
-    "category": "BI",
-    "subcategory": "库存指标",
+    "title": "SELECT formatDateTime(bill_date,'%Y-%m-%d') as billDate,name_st as nameSt,code_s",
+    "category": "SQL",
+    "subcategory": "查询与数据",
     "tags": [
-      "期末库存",
-      "可用库存",
-      "占用库存",
-      "在途库存",
-      "预计库存"
+      "select",
+      "join"
     ],
-    "summary": "库存指标按可用、占用和在途状态分别核算，预计库存包含在途数量。",
-    "content": "期末库存=可用库存+占用库存，不含在途库存；可用库存=期末库存-占用库存；占用库存包括已提交出库单或零售单但尚未出库的数量，按出库店仓统计；在途库存包括已出库但入库单未提交，以及采购订单生成的采购入库单未提交数量，按入库店仓统计，入库单被作废的数量不计入在途；采购在途库存是采购订单生成的采购入库单未提交数量；预计库存=期末库存+在途库存。",
+    "summary": "SELECT formatDateTime(bill_date,'%Y-%m-%d') as billDate,name_st as nameSt,code_st as codeSt,channel_name_new as channelNameNew,channel_code_new as channelCodeNew,bill_type_desc as billTypeDesc,bill_code as billCode,spu_code as spuCode,sku_c",
+    "content": "SELECT formatDateTime(bill_date,'%Y-%m-%d') as billDate,name_st as nameSt,code_st as codeSt,channel_name_new as channelNameNew,channel_code_new as channelCodeNew,bill_type_desc as billTypeDesc,bill_code as billCode,spu_code as spuCode,sku_color_value as skuColorValue,sku_size_value as skuSizeValue,sku_size_group_name as skuSizeGroupName,sku_size_sort_order as skuSizeSortOrder,sku_size_code as skuSizeCode,id_str as idStr,source_deal_order_id_new2 as sourceDealOrderIdNew2,formatDateTime(create_date_sale,'%Y-%m-%d') as createDateSale,name_sale as nameSale,biz_source_name as bizSourceName,bool_dropship_goods_desc as boolDropshipGoodsDesc,split_order_id as splitOrderId,order_sale_date as orderSaleDate,order_source_name as orderSourceName,third_order_id_fix as thirdOrderIdFix,third_porder_id_fix as thirdPorderIdFix,sum(inout_section_in_num) as sumInoutSectionInNum,sum(intout_section_out_num) as sumIntoutSectionOutNum,sum(inout_section_actual_num) as sumInoutSectionActualNum,sum(inout_section_in_money) as sumInoutSectionInMoney,sum(intout_section_out_money) as sumIntoutSectionOutMoney,sum(inout_section_actual_money) as sumInoutSectionActualMoney FROM  (SELECT biz_source_name,bill_code,bill_date,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order,name_sale,create_date_sale,id_str,source_deal_order_id_new2,order_source_name,bool_dropship_goods_desc,order_sale_date,third_order_id_fix,third_porder_id_fix,inout_section_in_num,intout_section_out_num,inout_section_in_money,intout_section_out_money,(inout_section_in_num + intout_section_out_num) as inout_section_actual_num,(inout_section_in_money + intout_section_out_money) as inout_section_actual_money FROM  (SELECT biz_source_name,bill_code,bill_date,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order,name_sale,create_date_sale,id_str,source_deal_order_id_new2,order_source_name,bool_dropship_goods_desc,order_sale_date,third_order_id_fix,third_porder_id_fix,if(bill_source =3020 or bill_source =3000 or bill_source =3010 or  bill_source =3030  or  bill_source =3040   or  bill_source =3050 ,paper_num ,0) as inout_section_in_num,if(bill_source =2020 or bill_source =2000 or bill_source =2010 or  bill_source =2030  or  bill_source =2040   or  bill_source =2050 ,-paper_num ,0) as intout_section_out_num,if(bill_source =3020 or bill_source =3000 or bill_source =3010 or  bill_source =3030  or  bill_source =3040 , item_amount  ,0) as inout_section_in_money,if(bill_source =2020 or bill_source =2000 or bill_source =2010 or  bill_source =2030  or  bill_source =2040 ,-item_amount ,0) as intout_section_out_money,item_amount,bill_source,paper_num FROM  (SELECT item_amount,biz_source_name,bill_code,bill_date,bill_source,paper_num,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order,name_sale,create_date_sale,id_str,source_deal_order_id_new2,order_source_name,if(bool_dropship_goods =1,'是','否') as bool_dropship_goods_desc,if(bill_date_sale ='1970-01-01','',toString(bill_date_sale)) as order_sale_date,if(third_order_id !='1',third_order_id ,'') as third_order_id_fix,if(third_porder_id !='0',third_porder_id ,'') as third_porder_id_fix,bill_date_sale,third_order_id,third_porder_id,bool_dropship_goods FROM  (SELECT item_amount,biz_source_name,bill_code,bill_date,bill_source,paper_num,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order,if(bill_date_refund is null or bill_date_refund ='1970-01-01',bill_date_sale,bill_date_refund) as bill_date_sale,if(name_refund is null or name_refund  ='',name_sale,name_refund) as name_sale,if(third_order_id_refund is null or third_order_id_refund  ='',third_order_id,third_order_id_refund) as third_order_id,if(third_porder_id_refund  is null or third_porder_id_refund  ='',third_porder_id,third_porder_id_refund) as third_porder_id,if(bool_dropship_goods_refund  is null or bool_dropship_goods_refund  =0,bool_dropship_goods,bool_dropship_goods_refund) as bool_dropship_goods,if(create_date_refund is null or create_date_refund ='1970-01-01',create_date_sale,create_date_refund) as create_date_sale,if(bill_type  = 20, \n\tif(original_bill_code is null or original_bill_code  = '',\n    \tref_bill_code , \n        if(ref_bill_type  != '85',original_bill_code,'')),\n\tif(ref_bill_type  = '90',\n    \toriginal_bill_code ,\n        if(ref_bill_type  != '85',ref_bill_code, ''))\n) as id_str,if (source_deal_order_id_new_refund  is null or source_deal_order_id_new_refund  = 0,\n\tif(source_deal_order_id_new is null or source_deal_order_id_new   = 0, null, source_deal_order_id_new) ,\n\tsource_deal_order_id_new_refund \n) as source_deal_order_id_new2,if (dict_name_refund   is null or  dict_name_refund   = '' ,dict_name, dict_name_refund) as order_source_name,bill_type,ref_bill_type,dict_name,source_deal_order_id_new,bill_date_refund,name_refund,third_order_id_refund,third_porder_id_refund,bool_dropship_goods_refund,create_date_refund,dict_name_refund,source_deal_order_id_new_refund FROM  (SELECT item_amount,biz_source_name,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order,bill_date_sale,name_sale,third_order_id,third_porder_id,bool_dropship_goods,create_date_sale,dict_name,source_deal_order_id_new,bill_date_refund,name_refund,third_order_id_refund,third_porder_id_refund,bool_dropship_goods_refund,create_date_refund,dict_name_refund,source_deal_order_id_new_refund FROM   (SELECT item_amount,biz_source_name,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order,bill_date_sale,name_sale,third_order_id,third_porder_id,bool_dropship_goods,create_date_sale,dict_name,source_deal_order_id_new FROM   (SELECT item_amount,biz_source_name,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,channel_code_new,channel_name_new,spu_id,sku_id_dim_sku,spu_code,sku_color_value,sku_size_code,sku_size_value,sku_size_group_name,sku_size_sort_order FROM   (SELECT item_amount,biz_source_name,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,split_order_id,up_bill_code,code_st,name_st,if(bill_to_st_ch =1,bl_ch_code ,code_ch) as channel_code_new,if(bill_to_st_ch =1,bl_ch_name  ,name_ch) as channel_name_new,bill_to_st_ch,bl_ch_code,bl_ch_name,code_ch,name_ch FROM  (SELECT item_amount,biz_source_name,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,channel_id,split_order_id,bill_to_st_ch,up_bill_code,code_st,name_st,bl_ch_code,bl_ch_name,code_ch,name_ch FROM   (SELECT item_amount,biz_source_name,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,storage_id,channel_id,split_order_id,bill_to_st_ch,up_bill_code,code_st,name_st,bl_ch_code,bl_ch_name FROM   (SELECT item_amount,biz_source_name,bill_item_id,bill_id,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,bill_type_desc,storage_id,channel_id,split_order_id,bill_to_st_ch,up_bill_code FROM   (SELECT item_amount,biz_source_name,bill_item_id,bill_id,bill_code,bill_date,sku_id,bill_type,bill_source,paper_num,ref_bill_type,ref_bill_code,original_bill_code,case when bill_source  = 3020 then '采购入库'\nwhen bill_source  = 3000 then '配货入库'\nwhen bill_source  = 3010 then '调拨入库'\nwhen bill_source  = 3030 then '退货入库'\nwhen bill_source  = 3040 then '零售入库'\nwhen bill_source  = 3050 then '归还入库'\nwhen bill_source  = 3099 then '其他入库'\nwhen bill_source  = 2020 then '采购退货'\nwhen bill_source  = 2000 then '配货出库'\nwhen bill_source  = 2010 then  '调拨出库'\nwhen bill_source  = 2030 then  '退货出库'\nwhen bill_source  = 2040 then  '零售出库'\nwhen bill_source  = 2050 then  '外借出库'\nwhen bill_source  = 2099 then  '其他出库'\nwhen bill_source =4000 and diff_num 0 then '盘盈入库'\nwhen bill_type =40 and diff_num >0 then '调整入库'\nwhen bill_type  =40 and diff_num = cast('2026-09-01' as DATE) and bill_date = cast('2026-09-01' as DATE) and bill_date = cast('2026-09-01' as DATE) and bill_date = cast('2026-09-01' as DATE) and bill_date = cast('2026-09-01' as DATE) and bill_date = cast('2026-09-01' as DATE) and bill_date <= cast('2026-09-01' as DATE) and bill_state in (5)))  art )))  art ) lt LEFT JOIN  (SELECT storage_id as storage_id_st,code,name FROM  (SELECT storage_id,code,name FROM flowload.dim_corp_storage_bi art final WHERE brand_id = 10770)  art ) rt ON lt.storage_id=rt.storage_id_st) lt LEFT JOIN  (SELECT dict_name,dict_value FROM flowload.dim_dict_order_source_ds art final) rt ON lt.order_source=rt.dict_value GROUP BY storage_id_st_refund,order_source_refund,source_deal_order_id_new_refund,dict_name_refund,source_deal_order_id,brand_sku_id_refund,id_str_refund,create_date_refund,id_refund,bill_date_refund,name_refund,code_refund,third_order_id_refund,third_porder_id_refund,customer_name_refund,bool_dropship_goods_refund) rt ON lt.ref_bill_code=rt.id_str_refund and lt.sku_id=rt.brand_sku_id_refund)  art )  art )  art )  art )  art  GROUP BY billDate,nameSt,codeSt,channelNameNew,channelCodeNew,billTypeDesc,billCode,spuCode,skuColorValue,skuSizeValue,skuSizeGroupName,skuSizeSortOrder,skuSizeCode,idStr,sourceDealOrderIdNew2,createDateSale,nameSale,bizSourceName,boolDropshipGoodsDesc,splitOrderId,orderSaleDate,orderSourceName,thirdOrderIdFix,thirdPorderIdFix WITH TOTALS ORDER BY billDate asc,nameSt asc,codeSt asc,channelNameNew asc,channelCodeNew asc,billTypeDesc asc,billCode asc,spuCode asc,skuColorValue asc,skuSizeValue asc,skuSizeGroupName asc,skuSizeSortOrder asc,skuSizeCode asc,idStr asc,sourceDealOrderIdNew2 asc,createDateSale asc,nameSale asc,bizSourceName asc,boolDropshipGoodsDesc asc,splitOrderId asc,orderSaleDate asc,orderSourceName asc,thirdOrderIdFix asc,thirdPorderIdFix asc,sumInoutSectionInNum desc  limit 0,1000",
     "source_date": "2026-09-01",
     "source_ids": [
+      "a4bc0022-2eea-4f0b-89b9-a9f5b762c5d6",
       "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
     ],
     "score": {
-      "reusability": 5,
-      "importance": 5,
-      "uniqueness": 5,
-      "stability": 5,
-      "personal_relevance": 5
+      "reusability": 3,
+      "importance": 3,
+      "uniqueness": 3,
+      "stability": 3,
+      "personal_relevance": 3
     },
-    "total_score": 25
+    "total_score": 15
   },
   {
-    "title": "库存查询筛选与权限控制规则",
-    "category": "BI",
-    "subcategory": "库存查询",
-    "tags": [
-      "模糊搜索",
-      "条件查询",
-      "排除零库存",
-      "商户权限",
-      "导出"
-    ],
-    "summary": "库存查询支持多字段筛选，但导出和商品字段展示受商户权限控制。",
-    "content": "商品货号、店仓和供应商支持模糊搜索；货号输入框右侧的查询条件入口可进行条件查询；开启“排除零库存”可过滤库存为零的门店；若界面缺少导出按钮或商品展示字段，应由商户管理员检查权限配置。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
-    ],
-    "score": {
-      "reusability": 4,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 4,
-      "personal_relevance": 4
-    },
-    "total_score": 20
-  },
-  {
-    "title": "盘点类型决定差异信息可见范围",
+    "title": "一、库存查询",
     "category": "Projects",
-    "subcategory": "库存盘点",
+    "subcategory": "项目",
     "tags": [
-      "盲盘",
-      "非盲盘",
-      "差异数量",
-      "差异明细"
+      "需求",
+      "功能"
     ],
-    "summary": "盲盘隐藏具体差异商品，非盲盘可查看并导出差异明细。",
-    "content": "盲盘过程中只展示差异数量，不展示具体差异商品；非盲盘可查看具体差异明细并导出，用于对照实盘结果、发现错盘和漏盘。盘点类型应依据公司的运营策略选择。",
+    "summary": "一、库存查询 功能介绍：一般用于商户人员查询商品； 商户人员可根据商品相关信息，或库存类相关条件来筛选查找商品的库存情况。在这里，商户人员可以查看本店的库存，也可以查看账号权限下其他门店的库存，以下为展示的库存字段解释： 1. 期末库存：可用库存+占用库存（不计算在途库存） 2. 可用库存：期末库存-占用库存（不计算在途库存） 3. 占用库存：期末库存-可用库存（不计算在途库存），所有的出库单已提交、零售单已提交，但未出库，都会按照出库店仓统计为占用库存。 4. 在途库存：出",
+    "content": "一、库存查询\n功能介绍：一般用于商户人员查询商品；\n       商户人员可根据商品相关信息，或库存类相关条件来筛选查找商品的库存情况。在这里，商户人员可以查看本店的库存，也可以查看账号权限下其他门店的库存，以下为展示的库存字段解释：\n1. 期末库存：可用库存+占用库存（不计算在途库存）\n2. 可用库存：期末库存-占用库存（不计算在途库存）\n3. 占用库存：期末库存-可用库存（不计算在途库存），所有的出库单已提交、零售单已提交，但未出库，都会按照出库店仓统计为占用库存。\n4. 在途库存：出库已出库，入库单未提交；采购订单生成的采购入库单未提交；都按入库店仓统计为在途库存。（不含入库单被人为作废的在途数量）\n5. 采购在途库存：采购订单生成的采购入库单未提交数量；\n6. 预计库存：期末库存+在途库存\n\n查询商品\n● 商品的货号、店仓、供应商是支持模糊搜索的。\neg：我有多个商品货号是lx开头，我想将这批商品都搜索出来。那么我直接在货号中搜索“lx”，\n属于我登录账号权限下所有为 “lx”开头的商品都会被查询出来了\n● 货号是支持按照条件来查询的，您点击货号输入框中右侧的房子图标，就会弹出查询条件框了。\n3.1.2. 查看商品库存：\n● 如果您查询出来的商品，不想查看那些库存为0的门店，那么您可以开启“排除零库存”选项。\n● 如果您的库存查询界面，没有导出按钮，或没有某些关于商品展示的字段，请联系您商户的管理员确认下是否权限未开启。\n二、盘点单\n盲盘与非盲盘\n门店人员可以根据公司的运营策略来决定盘点类型是盲盘还是非盲盘\n盲盘\n系统不会在盘点过程中体现出具体的商品库存差异明细只会体现出差异数量。也就是说系统会展示出商品差了几件，但是不会告诉你具体差了哪几件。\n非盲盘\n系统会在盘点过程中体现出具体的商品库存差异明细，可以具体查看到哪几件盘点有差异。门店人人员在盘点时可以查看这个差异明细，来对比盘点，避免疏漏。\n盘点前--准备工作\n盘点前的准备工作非常重要，准备工作做好了， 能让门店人员盘点时更加轻松。\n1.  检查一下有没有商品实物已经入库、出库，但是相应的入库单或出库单未提交的单据，避免实物已经发生改变，但是系统没有做账，导致的盘点差异。\n2.  盘点前将门店的货品摆放整齐，避免有死角造成漏盘错盘\n3.  安排好盘点人员和盘点顺序，规划好盘点区域，分区进行盘点。这样做的好处是避免盘点错了，分好区后也便于核对盘点差异。\n盘点中--盘点操作\n盘点时间\n       系统默认为前一天，如果选择的是前一天，则要盘点的是截止到昨天晚上12点的历史库存；时间选择的不一样，商品的盘点也是不一样的。\n时间选择今天\n       如果您要盘今天的，则需要把日期改为今天，无论您时间选择的是几点，在盘点单创建保存之后， 时间就会默认到日期当天截止23:59:59点。\n      盘点当日的库存，有2种方式，门店人员可以根据自己的实际需求来选择：\n● 可以选择营业结束之后再盘点；\n● 也可以选择营业期间盘点，但是在营业结束后需要点击刷新账面库存，那么在创建盘点单后产生的商品出入库也会盘点在内。\n时间选择昨天\n如果您要盘点昨天的，则需要把日期改为昨天。\n盘点昨日或者历史的商品库存，有2种场景，门店人员也需要注意一下：\n● 今天出库的商品：在今天卖出去的商品也是会盘进去的，因为要盘点的是截至到昨天12点的，昨天盘点时，今天那些卖出去的商品库存是还在的；\n● 今天入库的商品：如果是今天刚入库的商品，在盘点的时候库存是不能盘进去的，因为您要盘的是昨天的商品库存，在昨天的时候这件商品还没有入库。\n       因此在做盘点的单的时候，时间的选择非常重要，系统默认为前一天，一定要确定，是要盘截至昨天的历史库存，还是要盘截至今天晚上23:59:59的库存。\n注：盘点时间是默认到日期当日的23:59:59，无法选择实时盘点，即便您选择了实时盘点，在点击保存后，时间也会变成默认的时间。\n\n盘点店仓及商品\n盘点店仓\n       门店人员在选择好盘点店仓后，点击右侧可以查看该门店下未处理的单据。可以对该类型进行控制是否可创建可提交盘点单。\n\n盘点范围\n盘点范围有“全盘”和“部分盘”，系统默认是全盘的，两种盘点范围在操作上是没有区别的，只是盘点的范围会不同，门店人员可以按照公司的要求来进行选择。\n全盘：系统默认是全部盘点，也就是盘整个门店的商品，系统会根据盘点明细更新整个门店的库存。\n部分盘：您也可以选择盘点部分商品，手动的选择要盘点的商品，或者扫码选择。部分盘点时可查看盘点的商品\n\n商品类型\n        商品类型可以选择普通、礼品、物料等，您在盘点的时候可以按照需求来选择，如果只需要盘点普通商品，那选择普通即可；如果礼品物料等也需要盘点，那就将商品类型全选。\n注：在盘点完商品后如果修改了商品类型，不在此类型内的商品将会被删除。\n\n添加明细\n添加盘点号 \n由于门店有时候货品过多，一次性盘点全盘工作量过大，而且容易出错，并且不方便门店查找差异。\n推荐：\n● 根据店仓结构和存货的数量将门店货品分为10个区域左右；\n● 每个区域的商品数量在100~200左右，然后分别给不同的区域创建不同的盘点号；\n● 分别盘点不同区域的商品，不同的导购分别负责不同的盘点区域，减少盘点时间。\neg：要盘点店铺左面墙的区域作为01区域，这个区域的商品添加为01盘点号，然后点击下一步\n添加商品明细\n       扫描商品吊牌条码将商品进行明细盘点 ，鼠标光标放在商品查询框内，然后将左面墙的商品都一件一件扫描到系统里面。\n      如果有吊牌丢失或者条码不清的货品也可以在货号手动输入款号。\n      假如在盘点的时候不小心操作将不属于这个区域的商品盘点进来了，那我们可以点击，切换成减号，把这个不属于该区域的商品的条码再扫一遍，那么系统就会在下面的商品明细中去掉这个商品了。在将01区域的商品都添加完成后，点击关闭，下方就会体现出01区域，都盘点了哪些商品。\n\n注：如果扫码没有自动回车，请将输入法切换成英文试试，或者对照扫描枪说明书检查下扫码枪设置是否有问题。\n盘点其他区域商品\n重复以上两步骤来进行录入其他区域商品，创建多个盘点号，将门店其他区域的商品全部盘进来。\n● 在各个区域都盘点好后，我们需要核对一下各个区域的盘点数和实际数量是否符合，对比货号的盘点数和实际的数量是否符合，如果有漏盘的，我们点击相应盘点号后面的继续盘点，将漏盘的货品添加进去。\n● 在盘点时除了通过扫描，还可以通过导入，通过excel表格将商品明细按照格式填写入表格中，然后进入导入。\n● 对于有些门店盘点机导出的结果，可以点击文本导入，根据右侧的规则填写。\n\n盘点后--核对差异\n       接下来就是进行盘点检查了，在核查了盘点数和门店实际数量不相符的情况下，如果门店库存不准，可以在这里看到差异数量。\n查看差异明细\n● 对于盲盘来说，只能看到差异的数量是多少，无法查看到具体差异的是哪些商品；\n● 对于非盲盘来说，可以点击查看明细，可以查看具体的差异明细，并进行导出。通过这个差异明细我们可以看出，盘点结果和差异结果到底差异在哪里，避免错盘和漏盘。 \n      我们也可以按照汇总来查看盘点明细，如果是盲盘，这里的账面数量则都显示为空。\n\n错盘\n       如果有商品错盘，门店人员可以根据实际情况按照以下两种方式来处理删除掉盘错的商品，然后继续盘点正确的商品。\n1. 扫描商品：直接在添加商品明细的时候将商品删除，快速扫描中将加号“+”切换为减号“-”，鼠标光标放在输入框中，再次扫描要删除的商品。\n\n2. 也可以在盘点好后，手动的查找货号/sku进行删除；\n\n漏盘\n       如果出现商品漏盘，则可以点击对应的盘点号，点击右侧的继续盘点，重新添加商品信息。也可以再添加一个盘点号，继续添加商品明细。\n\n作废与冲销\n       盘点明细也可以进行导出，或者按照盘点号进行打印，按照汇总进行打印，如果盘点差异过大的话，我们也可以点击作废或者冲销。\n● 若盘点单状态为未提交，则可以作废这张未提交的盘点单，然后进行重新盘点；\n● 若是已提交的盘点单，则只能冲销，冲销后系统的账面库存会恢复到盘点之前了，再重新安排盘点就可以了。\n查找商品\n       如果要查看某个货号或者sku的盘点明细情况，可以在右侧输入商品的货号或者sku来进行快速查找。\n       在核对好商品差异，整理好错盘和漏盘的商品之后，我们就可以将这个盘点单提交了，系统会根据盘点明细自动更新门店系统的货品库存，保证系统的账面库存和门店实际库存一致。",
     "source_date": "2026-09-01",
     "source_ids": [
+      "a4bc0022-2eea-4f0b-89b9-a9f5b762c5d6",
       "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
     ],
     "score": {
-      "reusability": 5,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 5,
-      "personal_relevance": 4
+      "reusability": 3,
+      "importance": 3,
+      "uniqueness": 3,
+      "stability": 3,
+      "personal_relevance": 3
     },
-    "total_score": 22
-  },
-  {
-    "title": "盘点日期固定库存时点并影响业务范围",
-    "category": "Projects",
-    "subcategory": "库存盘点",
-    "tags": [
-      "盘点日期",
-      "23:59:59",
-      "历史库存",
-      "实时盘点",
-      "账面库存"
-    ],
-    "summary": "盘点日期决定核算库存的时点，保存后当天日期固定到23:59:59，系统不支持实时盘点。",
-    "content": "系统通常默认盘点前一天；选择今天并保存后，盘点时点固定为当天23:59:59，不能选择实时盘点。营业期间创建盘点单时，营业结束后需刷新账面库存，才能纳入创建盘点单后发生的出入库。盘点历史日期时，今天出库的商品可能仍属于昨日库存范围，而今天刚入库的商品不应计入昨日库存，因此创建盘点单前必须确认目标库存时点。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
-    ],
-    "score": {
-      "reusability": 5,
-      "importance": 5,
-      "uniqueness": 5,
-      "stability": 5,
-      "personal_relevance": 5
-    },
-    "total_score": 25
-  },
-  {
-    "title": "全盘部分盘及商品类型范围规则",
-    "category": "Projects",
-    "subcategory": "库存盘点",
-    "tags": [
-      "全盘",
-      "部分盘",
-      "商品类型",
-      "库存更新"
-    ],
-    "summary": "全盘更新门店全部商品库存，部分盘只更新选定商品，修改商品类型会删除范围外明细。",
-    "content": "全盘是对整个门店商品进行盘点，并依据盘点明细更新整个门店库存；部分盘只盘点手动选择或扫码选择的商品，并更新选定商品。商品类型可按普通、礼品、物料等需求筛选；盘点明细录入后若修改商品类型，不属于新类型范围的商品会被删除。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
-    ],
-    "score": {
-      "reusability": 5,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 5,
-      "personal_relevance": 4
-    },
-    "total_score": 22
-  },
-  {
-    "title": "盘点前准备与分区盘点组织方法",
-    "category": "Projects",
-    "subcategory": "库存盘点",
-    "tags": [
-      "盘点准备",
-      "未提交单据",
-      "分区",
-      "盘点号",
-      "库存差异"
-    ],
-    "summary": "盘点前应处理未提交出入库单并规划分区、人员和盘点顺序，以降低差异和漏盘风险。",
-    "content": "盘点前检查实物已入库或出库但对应单据尚未提交的情况，避免实物变化与系统账面不一致；整理货品、消除摆放死角，安排盘点人员和顺序并规划区域。货品较多时可按店仓结构分约10个区域，每区约100至200件商品，为各区域建立不同盘点号，分别录入并核对各区域数量。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
-    ],
-    "score": {
-      "reusability": 4,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 5,
-      "personal_relevance": 4
-    },
-    "total_score": 21
-  },
-  {
-    "title": "盘点录入及错盘漏盘处理方法",
-    "category": "Projects",
-    "subcategory": "库存盘点",
-    "tags": [
-      "扫码录入",
-      "Excel导入",
-      "文本导入",
-      "错盘",
-      "漏盘"
-    ],
-    "summary": "盘点商品可扫码、手工或导入录入，错盘通过减号删除，漏盘通过继续盘点补录。",
-    "content": "商品明细支持扫描吊牌条码、手动输入货号、Excel导入和按规则文本导入。扫码未自动回车时，应切换英文输入法或检查扫描枪设置。错盘商品可在快速扫描中将加号切换为减号后再次扫描删除，也可盘点后按货号或SKU手动删除；漏盘商品可进入对应盘点号继续盘点，或新增盘点号补录。各区域录入后需核对盘点数与实物数量。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
-    ],
-    "score": {
-      "reusability": 5,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 5,
-      "personal_relevance": 4
-    },
-    "total_score": 22
-  },
-  {
-    "title": "盘点单作废冲销与提交规则",
-    "category": "Projects",
-    "subcategory": "库存盘点",
-    "tags": [
-      "盘点单",
-      "作废",
-      "冲销",
-      "提交",
-      "库存恢复"
-    ],
-    "summary": "未提交盘点单可作废，已提交盘点单只能冲销，提交会按盘点结果更新门店库存。",
-    "content": "盘点差异核对并处理错盘、漏盘后再提交盘点单，系统会按盘点明细自动更新门店账面库存。状态为未提交的盘点单可以作废并重新盘点；状态为已提交的盘点单不能作废，只能冲销，冲销后账面库存恢复到盘点前状态，再重新安排盘点。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
-    ],
-    "score": {
-      "reusability": 5,
-      "importance": 5,
-      "uniqueness": 5,
-      "stability": 5,
-      "personal_relevance": 5
-    },
-    "total_score": 25
+    "total_score": 15
   }
 ]

@@ -1,0 +1,14 @@
+[
+  {
+    "title": "SELECT formatDateTime(bill_date,'%Y-%m-%d') as billDate,name_st as nameSt,code_s",
+    "category": "SQL",
+    "subcategory": "查询与数据",
+    "tags": ["ClickHouse", "库存出入库", "dm_wms_bill_all_ds", "FINAL", "SQL性能"],
+    "summary": "KA 集群实测：SQL 查询品牌 10770 在 2026-09-01 已提交的零售入库和零售出库明细，按单据、店仓、渠道、SKU 和订单关联字段聚合；返回 6 行，入库 3 件/19.89，出库 4 件/21，净数量 -1、净金额 -1.11。",
+    "content": "## 查询口径\n- 数据源为 flowload.dm_wms_bill_all_ds，主过滤为 brand_id=10770、bill_date=2026-09-01、bill_state=5、bill_source in (2040,3040)。其中 3040 映射零售入库，2040 映射零售出库。外层将出库 paper_num 和 item_amount 取负，并计算实际数量/金额。\n- 通过 dm_wms_bill_all_ds 自关联推导 up_bill_code；再关联 dim_corp_storage_bi 两次补店仓和渠道、dim_goods_sku_bi 补 SKU 属性、dm_order_item_sale_bi_ds 补销售/退款订单字段、dim_dict_order_source_ds 补订单来源。销售与退款订单分别按原单号/关联单号和 SKU 关联。\n- 最终按 25 个维度分组，WITH TOTALS 后排序并 LIMIT 0,1000；因此结果粒度接近单据明细，只有完全相同维度的行才会合并。\n\n## KA 验证\n- flowdata-ka ClickHouse 25.12.1.1645，原 SQL 耗时 1.051 秒，返回 6 行。\n- 汇总：3040 入库 3 行、3 件、19.89；2040 出库 3 行、4 件、21；净变动 -1 件、-1.11。结果店仓均为艺尚小镇店、渠道均为总部。\n- EXPLAIN 显示 brand_id 分区裁剪为 3/149 parts，主键 bill_date+brand_id 将 granules 从 15 降到 3，日期条件有效。\n\n## 风险与优化建议\n- 内层重复扫描 dm_wms_bill_all_ds 并多次使用 FINAL，查询文本约 45 层 SELECT、10 次 JOIN；数据量扩大后 CPU、内存和延迟会明显上升。建议先物化一次带日期/品牌/状态/来源过滤的明细 CTE 或中间表，再复用订单号集合和维表。\n- bill_state in (5,7) 外层又限定 bill_state in (5)，实际只保留 5，应删除冗余条件。日期单日范围可直接写 bill_date=toDate('2026-09-01')。\n- 3040/2040 的入出库金额和数量符号逻辑正确，但需确认 paper_num 是否允许负数；否则出库取负后会出现符号反转。\n- INNER JOIN up_bill_code 和 SKU 维表会丢失无匹配明细；订单、店仓、渠道使用 LEFT JOIN，缺失时会输出空字段。建议增加基表行数与最终行数对账，以及未匹配 SKU/订单的监控。\n- WITH TOTALS 配合 JSONEachRow/导出时要确认客户端对 totals 行的处理；LIMIT 应放在确认 totals 展示需求后使用。",
+    "source_date": "2026-09-01",
+    "source_ids": ["a4bc0022-2eea-4f0b-89b9-a9f5b762c5d6"],
+    "score": {"reusability": 5, "importance": 4, "uniqueness": 4, "stability": 4, "personal_relevance": 4},
+    "total_score": 21
+  }
+]
