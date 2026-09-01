@@ -154,6 +154,7 @@ Automatically generated from active Markdown memories.
 - [盘点录入及错盘漏盘处理方法](03_Memory/Projects/盘点录入及错盘漏盘处理方法-565e0cf2.md)
 - [盘点日期固定库存时点并影响业务范围](03_Memory/Projects/盘点日期固定库存时点并影响业务范围-2bfe0a05.md)
 - [盘点类型决定差异信息可见范围](03_Memory/Projects/盘点类型决定差异信息可见范围-e5dfb01f.md)
+- [补货申请单](03_Memory/Projects/补货申请单-2d5a3287.md)
 - [订单与预售状态码](03_Memory/Projects/BI/订单与预售状态码.md)
 - [订单支付预售与库存单据指标](03_Memory/Projects/订单支付预售与库存单据指标-6488e6a3.md)
 - [零售同款换货的适用范围与退单规则](03_Memory/Projects/零售同款换货的适用范围与退单规则-d4249343.md)
@@ -164,7 +165,7 @@ Automatically generated from active Markdown memories.
 ## SQL
 
 - [ClickHouse 查询技能与只读查询规范](03_Memory/SQL/clickhouse-查询技能与只读查询规范-72cc7a2e.md)
-- [会员销售归类异常：品牌 15056](03_Memory/SQL/SQL问题排查/会员销售归类异常-品牌15056.md)
+- [会员销售归类异常：品牌 15056](03_Memory/SQL/SQL问题排查/问题1/会员销售归类异常-品牌15056.md)
 - [期初库存与 biz_type](03_Memory/SQL/字段血缘/期初库存与biz_type.md)
 
 ## Testing

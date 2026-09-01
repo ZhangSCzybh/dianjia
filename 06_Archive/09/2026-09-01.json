@@ -2,10 +2,12 @@
   "date": "2026-09-01",
   "source_ids": [
     "a4bc0022-2eea-4f0b-89b9-a9f5b762c5d6",
+    "0d1e5c95-4ea3-4b9b-b87e-28f220cb39af",
     "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
   ],
   "completed": [
     "SELECT formatDateTime(bill_date,'%Y-%m-%d') as billDate,name_st as nameSt,code_st as codeSt,channel_name_new as channelNameNew,channel_code_new as channelCodeNew,bill_type_desc as billTypeDesc,bill_co",
+    "补货申请单",
     "一、库存查询"
   ],
   "problems": [],
