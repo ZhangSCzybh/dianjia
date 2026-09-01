@@ -180,4 +180,5 @@ Automatically generated from active Markdown memories.
 ## Workflow
 
 - [库存业务单据编号前缀与后缀识别规则](03_Memory/Workflow/库存业务单据编号前缀与后缀识别规则-0590aba1.md)
+- [店仓出入库差异单的生成与责任处理规则](03_Memory/Workflow/店仓出入库差异单的生成与责任处理规则-c36eb0e6.md)
 - [配货调拨退货指令型单据的出入库状态](03_Memory/Workflow/配货调拨退货指令型单据的出入库状态-ab1f70a1.md)
