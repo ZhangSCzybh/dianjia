@@ -19,6 +19,8 @@ Automatically generated from active Markdown memories.
 - [商场预售单操作及转销售单全流程规则](03_Memory/BI/商场预售单操作及转销售单全流程规则-ce56de43.md)
 - [四类ClickHouse报表SQL执行结果验证](03_Memory/BI/四类clickhouse报表sql执行结果验证-09f2a2a1.md)
 - [多维报表人数温度聚合与 Cube 别名规则](03_Memory/BI/多维报表人数温度聚合与-cube-别名规则-85bd09e1.md)
+- [库存字段口径及库存推导关系](03_Memory/BI/库存字段口径及库存推导关系-73990f69.md)
+- [库存查询筛选与权限控制规则](03_Memory/BI/库存查询筛选与权限控制规则-473c3123.md)
 - [报表中心属性更新频率：维度实时更新，属性15分钟延迟](03_Memory/BI/报表中心属性更新频率-维度实时更新-属性15分钟延迟-eeab916a.md)
 - [报表中心敏感字段权限与虚拟数据规则](03_Memory/BI/报表中心敏感字段权限与虚拟数据规则-ba830aac.md)
 - [报表同环比时间维度与粒度规则](03_Memory/BI/指标计算/报表同环比时间维度与粒度规则.md)
@@ -145,7 +147,13 @@ Automatically generated from active Markdown memories.
 ## Projects
 
 - [POS 收单流程与规则](03_Memory/Projects/pos-收单流程与规则-12965d4f.md)
+- [全盘部分盘及商品类型范围规则](03_Memory/Projects/全盘部分盘及商品类型范围规则-a7cc96b2.md)
 - [异款换货按退货加购买并限制积分抵扣](03_Memory/Projects/异款换货按退货加购买并限制积分抵扣-0c0f1423.md)
+- [盘点前准备与分区盘点组织方法](03_Memory/Projects/盘点前准备与分区盘点组织方法-f039186b.md)
+- [盘点单作废冲销与提交规则](03_Memory/Projects/盘点单作废冲销与提交规则-bd9fdfdf.md)
+- [盘点录入及错盘漏盘处理方法](03_Memory/Projects/盘点录入及错盘漏盘处理方法-565e0cf2.md)
+- [盘点日期固定库存时点并影响业务范围](03_Memory/Projects/盘点日期固定库存时点并影响业务范围-2bfe0a05.md)
+- [盘点类型决定差异信息可见范围](03_Memory/Projects/盘点类型决定差异信息可见范围-e5dfb01f.md)
 - [订单与预售状态码](03_Memory/Projects/BI/订单与预售状态码.md)
 - [订单支付预售与库存单据指标](03_Memory/Projects/订单支付预售与库存单据指标-6488e6a3.md)
 - [零售同款换货的适用范围与退单规则](03_Memory/Projects/零售同款换货的适用范围与退单规则-d4249343.md)

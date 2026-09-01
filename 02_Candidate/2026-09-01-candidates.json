@@ -1,105 +1,208 @@
 [
   {
-    "title": "零售同款换货的适用范围与退单规则",
-    "category": "Projects",
-    "subcategory": "门店POS换单",
+    "title": "库存字段口径及库存推导关系",
+    "category": "BI",
+    "subcategory": "库存指标",
     "tags": [
-      "零售",
-      "同款换货",
-      "退单",
-      "收银操作"
+      "期末库存",
+      "可用库存",
+      "占用库存",
+      "在途库存",
+      "预计库存"
     ],
-    "summary": "同款换货无差价可直接提交，但不支持同款同色。",
-    "content": "勾选商品并选择同款换货，指定替换规格、换单导购和换货理由后即可提交。系统不支持同款同色更换，需先退单再重新购买。",
+    "summary": "库存指标按可用、占用和在途状态分别核算，预计库存包含在途数量。",
+    "content": "期末库存=可用库存+占用库存，不含在途库存；可用库存=期末库存-占用库存；占用库存包括已提交出库单或零售单但尚未出库的数量，按出库店仓统计；在途库存包括已出库但入库单未提交，以及采购订单生成的采购入库单未提交数量，按入库店仓统计，入库单被作废的数量不计入在途；采购在途库存是采购订单生成的采购入库单未提交数量；预计库存=期末库存+在途库存。",
     "source_date": "2026-09-01",
     "source_ids": [
-      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
-    ],
-    "score": {
-      "reusability": 4,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 4,
-      "personal_relevance": 4
-    },
-    "total_score": 20
-  },
-  {
-    "title": "零售异款换货的金额折扣业绩与积分规则",
-    "category": "Projects",
-    "subcategory": "门店POS换单",
-    "tags": [
-      "零售",
-      "异款换货",
-      "折扣",
-      "业绩",
-      "积分"
-    ],
-    "summary": "异款换货按退货加新购处理，系统自动计算应退款或应收款。",
-    "content": "选择异款换货后，可通过SKU、货号或条形码搜索新商品。系统根据商品金额、折扣和优惠券自动计算退款或收款；业绩按所选导购分配。换单过程不能使用积分抵扣，如需积分抵扣，应先退货再重新收单。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
-    ],
-    "score": {
-      "reusability": 4,
-      "importance": 4,
-      "uniqueness": 4,
-      "stability": 4,
-      "personal_relevance": 4
-    },
-    "total_score": 20
-  },
-  {
-    "title": "门店POS复打小票的类型与操作路径",
-    "category": "Projects",
-    "subcategory": "门店POS收银台",
-    "tags": [
-      "复打小票",
-      "零售小票",
-      "退货小票",
-      "换货小票",
-      "预售"
-    ],
-    "summary": "复打小票支持多类单据按筛选条件重复打印。",
-    "content": "路径为“门店POS--收银台--复打小票”。支持零售、退货、换货和商品预售小票的多次打印，可使用筛选条件查询订单；未查询时默认按时间排序。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
-    ],
-    "score": {
-      "reusability": 3,
-      "importance": 3,
-      "uniqueness": 3,
-      "stability": 4,
-      "personal_relevance": 3
-    },
-    "total_score": 16
-  },
-  {
-    "title": "零售补单的日期口径及财务对账差异",
-    "category": "Projects",
-    "subcategory": "门店POS零售补单",
-    "tags": [
-      "零售补单",
-      "历史订单",
-      "业绩日期",
-      "收款日期",
-      "财务对账"
-    ],
-    "summary": "补录历史订单时，业绩归属原订单日期，收款归属补单当天。",
-    "content": "路径为“门店POS--收银台--零售补单”，可补录历史销售单和退单。补单时填写历史日期，业绩计入该历史日期，收款金额计入补单当天。数据银行统计补录及外部导入订单业绩，但财务零售单对账（门店支付统计）不包含这些订单，因此可能出现对账差异。",
-    "source_date": "2026-09-01",
-    "source_ids": [
-      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
     ],
     "score": {
       "reusability": 5,
       "importance": 5,
-      "uniqueness": 4,
-      "stability": 4,
+      "uniqueness": 5,
+      "stability": 5,
       "personal_relevance": 5
     },
-    "total_score": 23
+    "total_score": 25
+  },
+  {
+    "title": "库存查询筛选与权限控制规则",
+    "category": "BI",
+    "subcategory": "库存查询",
+    "tags": [
+      "模糊搜索",
+      "条件查询",
+      "排除零库存",
+      "商户权限",
+      "导出"
+    ],
+    "summary": "库存查询支持多字段筛选，但导出和商品字段展示受商户权限控制。",
+    "content": "商品货号、店仓和供应商支持模糊搜索；货号输入框右侧的查询条件入口可进行条件查询；开启“排除零库存”可过滤库存为零的门店；若界面缺少导出按钮或商品展示字段，应由商户管理员检查权限配置。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 20
+  },
+  {
+    "title": "盘点类型决定差异信息可见范围",
+    "category": "Projects",
+    "subcategory": "库存盘点",
+    "tags": [
+      "盲盘",
+      "非盲盘",
+      "差异数量",
+      "差异明细"
+    ],
+    "summary": "盲盘隐藏具体差异商品，非盲盘可查看并导出差异明细。",
+    "content": "盲盘过程中只展示差异数量，不展示具体差异商品；非盲盘可查看具体差异明细并导出，用于对照实盘结果、发现错盘和漏盘。盘点类型应依据公司的运营策略选择。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 4
+    },
+    "total_score": 22
+  },
+  {
+    "title": "盘点日期固定库存时点并影响业务范围",
+    "category": "Projects",
+    "subcategory": "库存盘点",
+    "tags": [
+      "盘点日期",
+      "23:59:59",
+      "历史库存",
+      "实时盘点",
+      "账面库存"
+    ],
+    "summary": "盘点日期决定核算库存的时点，保存后当天日期固定到23:59:59，系统不支持实时盘点。",
+    "content": "系统通常默认盘点前一天；选择今天并保存后，盘点时点固定为当天23:59:59，不能选择实时盘点。营业期间创建盘点单时，营业结束后需刷新账面库存，才能纳入创建盘点单后发生的出入库。盘点历史日期时，今天出库的商品可能仍属于昨日库存范围，而今天刚入库的商品不应计入昨日库存，因此创建盘点单前必须确认目标库存时点。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 5,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 25
+  },
+  {
+    "title": "全盘部分盘及商品类型范围规则",
+    "category": "Projects",
+    "subcategory": "库存盘点",
+    "tags": [
+      "全盘",
+      "部分盘",
+      "商品类型",
+      "库存更新"
+    ],
+    "summary": "全盘更新门店全部商品库存，部分盘只更新选定商品，修改商品类型会删除范围外明细。",
+    "content": "全盘是对整个门店商品进行盘点，并依据盘点明细更新整个门店库存；部分盘只盘点手动选择或扫码选择的商品，并更新选定商品。商品类型可按普通、礼品、物料等需求筛选；盘点明细录入后若修改商品类型，不属于新类型范围的商品会被删除。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 4
+    },
+    "total_score": 22
+  },
+  {
+    "title": "盘点前准备与分区盘点组织方法",
+    "category": "Projects",
+    "subcategory": "库存盘点",
+    "tags": [
+      "盘点准备",
+      "未提交单据",
+      "分区",
+      "盘点号",
+      "库存差异"
+    ],
+    "summary": "盘点前应处理未提交出入库单并规划分区、人员和盘点顺序，以降低差异和漏盘风险。",
+    "content": "盘点前检查实物已入库或出库但对应单据尚未提交的情况，避免实物变化与系统账面不一致；整理货品、消除摆放死角，安排盘点人员和顺序并规划区域。货品较多时可按店仓结构分约10个区域，每区约100至200件商品，为各区域建立不同盘点号，分别录入并核对各区域数量。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 4
+    },
+    "total_score": 21
+  },
+  {
+    "title": "盘点录入及错盘漏盘处理方法",
+    "category": "Projects",
+    "subcategory": "库存盘点",
+    "tags": [
+      "扫码录入",
+      "Excel导入",
+      "文本导入",
+      "错盘",
+      "漏盘"
+    ],
+    "summary": "盘点商品可扫码、手工或导入录入，错盘通过减号删除，漏盘通过继续盘点补录。",
+    "content": "商品明细支持扫描吊牌条码、手动输入货号、Excel导入和按规则文本导入。扫码未自动回车时，应切换英文输入法或检查扫描枪设置。错盘商品可在快速扫描中将加号切换为减号后再次扫描删除，也可盘点后按货号或SKU手动删除；漏盘商品可进入对应盘点号继续盘点，或新增盘点号补录。各区域录入后需核对盘点数与实物数量。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 4
+    },
+    "total_score": 22
+  },
+  {
+    "title": "盘点单作废冲销与提交规则",
+    "category": "Projects",
+    "subcategory": "库存盘点",
+    "tags": [
+      "盘点单",
+      "作废",
+      "冲销",
+      "提交",
+      "库存恢复"
+    ],
+    "summary": "未提交盘点单可作废，已提交盘点单只能冲销，提交会按盘点结果更新门店库存。",
+    "content": "盘点差异核对并处理错盘、漏盘后再提交盘点单，系统会按盘点明细自动更新门店账面库存。状态为未提交的盘点单可以作废并重新盘点；状态为已提交的盘点单不能作废，只能冲销，冲销后账面库存恢复到盘点前状态，再重新安排盘点。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "f9789720-1d4a-4a3e-bad5-df2c367a53d8"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 5,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 25
   }
 ]
