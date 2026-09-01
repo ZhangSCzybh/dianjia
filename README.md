@@ -1,6 +1,6 @@
 # Dianjia Knowledge Base
 
-这是 Dianjia 的 Markdown 知识库和长期记忆事实来源。程序、Web 控制台、CLI 和 API 配置说明位于相邻项目 [dianjia-py](../dianjia-py/README.md)；本文件只定义知识库的治理规则、数据格式和处理流程。
+这是 Dianjia 的 Markdown 知识库和长期记忆事实来源。程序、Web 控制台、CLI 和 API 配置说明位于项目 [dianjia-py](dianjia-py/README.md)；本文件只定义知识库的治理规则、数据格式和处理流程。
 
 ## 核心原则
 
@@ -299,4 +299,4 @@ discard   → 不写长期记忆，只记录 memory_actions
 
 ## 操作说明
 
-请参阅 [dianjia-py README](../dianjia-py/README.md)，其中包含 CLI、Web 控制台、`.env`、RAG API、迁移命令和故障排查说明。
+请参阅 [dianjia-py README](dianjia-py/README.md)，其中包含 CLI、Web 控制台、`.env`、RAG API、迁移命令和故障排查说明。
