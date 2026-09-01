@@ -1,0 +1,105 @@
+[
+  {
+    "title": "零售同款换货的适用范围与退单规则",
+    "category": "Projects",
+    "subcategory": "门店POS换单",
+    "tags": [
+      "零售",
+      "同款换货",
+      "退单",
+      "收银操作"
+    ],
+    "summary": "同款换货无差价可直接提交，但不支持同款同色。",
+    "content": "勾选商品并选择同款换货，指定替换规格、换单导购和换货理由后即可提交。系统不支持同款同色更换，需先退单再重新购买。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 20
+  },
+  {
+    "title": "零售异款换货的金额折扣业绩与积分规则",
+    "category": "Projects",
+    "subcategory": "门店POS换单",
+    "tags": [
+      "零售",
+      "异款换货",
+      "折扣",
+      "业绩",
+      "积分"
+    ],
+    "summary": "异款换货按退货加新购处理，系统自动计算应退款或应收款。",
+    "content": "选择异款换货后，可通过SKU、货号或条形码搜索新商品。系统根据商品金额、折扣和优惠券自动计算退款或收款；业绩按所选导购分配。换单过程不能使用积分抵扣，如需积分抵扣，应先退货再重新收单。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 20
+  },
+  {
+    "title": "门店POS复打小票的类型与操作路径",
+    "category": "Projects",
+    "subcategory": "门店POS收银台",
+    "tags": [
+      "复打小票",
+      "零售小票",
+      "退货小票",
+      "换货小票",
+      "预售"
+    ],
+    "summary": "复打小票支持多类单据按筛选条件重复打印。",
+    "content": "路径为“门店POS--收银台--复打小票”。支持零售、退货、换货和商品预售小票的多次打印，可使用筛选条件查询订单；未查询时默认按时间排序。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
+    ],
+    "score": {
+      "reusability": 3,
+      "importance": 3,
+      "uniqueness": 3,
+      "stability": 4,
+      "personal_relevance": 3
+    },
+    "total_score": 16
+  },
+  {
+    "title": "零售补单的日期口径及财务对账差异",
+    "category": "Projects",
+    "subcategory": "门店POS零售补单",
+    "tags": [
+      "零售补单",
+      "历史订单",
+      "业绩日期",
+      "收款日期",
+      "财务对账"
+    ],
+    "summary": "补录历史订单时，业绩归属原订单日期，收款归属补单当天。",
+    "content": "路径为“门店POS--收银台--零售补单”，可补录历史销售单和退单。补单时填写历史日期，业绩计入该历史日期，收款金额计入补单当天。数据银行统计补录及外部导入订单业绩，但财务零售单对账（门店支付统计）不包含这些订单，因此可能出现对账差异。",
+    "source_date": "2026-09-01",
+    "source_ids": [
+      "4a0320f8-a0ee-46c7-a1e4-d1f6ecd77c1f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 5
+    },
+    "total_score": 23
+  }
+]

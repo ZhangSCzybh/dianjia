@@ -145,8 +145,12 @@ Automatically generated from active Markdown memories.
 ## Projects
 
 - [POS 收单流程与规则](03_Memory/Projects/pos-收单流程与规则-12965d4f.md)
+- [异款换货按退货加购买并限制积分抵扣](03_Memory/Projects/异款换货按退货加购买并限制积分抵扣-0c0f1423.md)
 - [订单与预售状态码](03_Memory/Projects/BI/订单与预售状态码.md)
 - [订单支付预售与库存单据指标](03_Memory/Projects/订单支付预售与库存单据指标-6488e6a3.md)
+- [零售同款换货的适用范围与退单规则](03_Memory/Projects/零售同款换货的适用范围与退单规则-d4249343.md)
+- [零售异款换货的金额折扣业绩与积分规则](03_Memory/Projects/零售异款换货的金额折扣业绩与积分规则-9ea3db58.md)
+- [零售补单的日期口径及财务对账差异](03_Memory/Projects/零售补单的日期口径及财务对账差异-30347ccd.md)
 - [零售退单需先查单再核对商品金额并选择退款方式](03_Memory/Projects/零售退单需先查单再核对商品金额并选择退款方式-086a0497.md)
 
 ## SQL
