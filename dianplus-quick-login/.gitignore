@@ -1,0 +1,6 @@
+.env
+session.cookies.txt
+session.cookies.json
+trace-sql/
+__pycache__/
+tests/__pycache__/
