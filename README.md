@@ -1,6 +1,6 @@
 # Dianjia Knowledge Base
 
-这是 Dianjia 的 Markdown 知识库和长期记忆事实来源。程序、Web 控制台、CLI 和 API 配置说明位于项目 [dianjia-py](dianjia-py/README.md)；本文件只定义知识库的治理规则、数据格式和处理流程。
+Dianjia 是一个以 Markdown 为事实来源、以 RAG 为检索基础、通过 LLM 和 Jev 辅助完成知识提取、去重、合并与问答的个人长期记忆知识库。程序、Web 控制台、CLI 和 API 配置说明位于项目 [dianjia-py](dianjia-py/README.md)；本文件只定义知识库的治理规则、数据格式和处理流程。
 
 ## 核心原则
 
