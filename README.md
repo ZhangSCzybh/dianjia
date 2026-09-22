@@ -128,7 +128,7 @@ Extractor 只负责发现可能值得保存的知识，不决定最终归档操�
 | 17-20 | 适合长期记忆，交由 Judge 决定 create/update/merge |
 | 21-25 | 高价值核心记忆，仍需经过检索和 Judge |
 
-实现约束：`total_score` 始终由五项评分之和计算，不能使用 AI 单独返回的不一致总分。AI Judge 即使返回 `create`，当总分低于 12 时也会自动降级为 `candidate`，保留在候选区待复核，不直接写入长期记忆。
+实现约束：`total_score` 始终由五项评分之和计算，不能采用判断模型单独返回的不一致总分。Judge 即使返回 `create`，当总分低于 12 时也会自动降级为 `candidate`，保留在候选区待复核，不直接写入长期记忆。
 
 ### 4. Retrieve
 
@@ -147,7 +147,7 @@ Extractor 只负责发现可能值得保存的知识，不决定最终归档操�
 
 ### 5. Memory Judge
 
-Judge 的输入是 `CandidateMemory + Top 5 Existing Memories`。AI 只返回 `MemoryDecision` JSON，Python 对其校验后才执行：
+Judge 的输入是 `CandidateMemory + Top 5 Existing Memories`。判断模型只返回 `MemoryDecision` JSON，Python 对其校验后才执行：
 
 ```json
 {
@@ -176,7 +176,21 @@ Judge 的输入是 `CandidateMemory + Top 5 Existing Memories`。AI 只返回 `M
 | `discard` | 丢弃临时、重复或低价值内容 |
 | `conflict` | 标记与已有记忆冲突，等待人工确认 |
 
-`update` 和 `merge` 必须携带真实存在的 `target_memory_id`；`confidence` 必须在 0 到 1；`total_score` 必须在 0 到 25。AI 不可用时，系统使用本地 create/update/candidate 兜底规则。
+`update` 和 `merge` 必须携带真实存在的 `target_memory_id`；`confidence` 必须在 0 到 1；`total_score` 必须在 0 到 25。判断模型不可用时，系统使用本地 create/update/candidate 兜底规则。
+
+#### TypeSafe Jev 可选判断器
+
+[TypeSafe Jev](https://docs.typesafe.ai/introduction) 是可选的结构化判断模型，只参与候选记忆的决策，不生成日报、候选正文或 RAG 答案。启用后，它根据当前 `CandidateMemory` 和本地检索到的 Top 5 记忆选择动作、主目标以及参与合并的记忆；返回结果仍是上面的 `MemoryDecision`，不能直接指定文件路径、修改 Markdown 或写入 SQLite。
+
+Jev 默认关闭，只有显式设置 `DIANJIA_MEMORY_JUDGE=typesafe` 才会启用。每条候选的判断按以下顺序降级：
+
+```text
+TypeSafe Jev
+→ 现有 AI_PROVIDER 通用判断器
+→ 本地规则
+```
+
+无论使用哪一种判断器，Python 都负责校验评分阈值、目标 ID、合并范围和持久化安全：低于长期记忆阈值的 `create`、缺少有效目标的 `update`、没有额外合并对象的 `merge` 都会降级为 `candidate`。审计记录保存实际模型版本、动作概率和置信度，不保存 API Key。环境变量、调用失败行为和项目内 `$typesafe-ai` Skill 的使用方式见 [dianjia-py 配置说明](dianjia-py/README.md#typesafe-jev-%E8%AE%B0%E5%BF%86%E5%88%A4%E5%AE%9A)。
 
 ## 长期记忆格式
 
