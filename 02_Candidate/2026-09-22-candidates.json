@@ -1,0 +1,297 @@
+[
+  {
+    "title": "普通销售净量的订单类型和退货处理规则",
+    "category": "BI",
+    "subcategory": "销售指标口径",
+    "tags": [
+      "销售",
+      "退货",
+      "净销量",
+      "订单类型",
+      "动销"
+    ],
+    "summary": "普通销售净量以成交数量减退货数量计算，并排除指定订单类型；净销量必须大于 0 才能判定为动销。",
+    "content": "普通销售净量定义为 sale_deal_num - sale_refund_num，并排除 order_type IN (4,5) 的记录。当前和期间动销、生命周期周销量均应使用该普通销售净量。净销量等于 0 或小于 0 时，不应计为动销。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 5
+    },
+    "total_score": 23,
+    "category_action": "existing",
+    "category_reason": "内容定义销售、退货和动销的业务计算口径，属于 BI 指标规则。",
+    "category_confidence": 0.98
+  },
+  {
+    "title": "生命周期周销量的首到店日与边界规则",
+    "category": "BI",
+    "subcategory": "生命周期指标口径",
+    "tags": [
+      "生命周期",
+      "周销量",
+      "首次到店",
+      "销售守恒",
+      "时间边界"
+    ],
+    "summary": "生命周期从首次到店当天起按自然日分周，第 1 至 26 周覆盖第 1 至 182 天，第 183 天起归入第 26 周后。",
+    "content": "首次到店日按门店加 SKU 维度，从首次调拨入、调入、采购入日期中取得最早非空日期。生命周期日数为销售日与首次到店日的日差加 1：第 X 周覆盖第 7*(X-1)+1 至第 7*X 天，X 为 1 至 26；第 26 周覆盖第 176 至 182 天；第 183 天及以后归入第 26 周后。首次到店日缺失、为无效日期，或销售早于首次到店日时，该销售不进入任何生命周期周字段。有效生命周期销售的第 1 至 26 周和第 26 周后销量之和，应与首次到店日至统计结束日期间的普通销售净量守恒；差异仅应来自首次到店缺失或到店前销售。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 5,
+      "stability": 4,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "这是商品生命周期销售分析的长期指标定义和校验规则，属于 BI 口径。",
+    "category_confidence": 0.98
+  },
+  {
+    "title": "SKC与SPU动销指标必须按对应层级去重",
+    "category": "BI",
+    "subcategory": "层级聚合口径",
+    "tags": [
+      "SKC",
+      "SPU",
+      "SKU",
+      "countDistinct",
+      "动销",
+      "去重"
+    ],
+    "summary": "SKC 和 SPU 指标不可从 SKU 行直接相加，必须在目标业务层级按唯一标识去重计算。",
+    "content": "同一 SKC 下存在多个 SKU、同一 SPU 下存在多个 SKC 时，铺店数和动销数应分别在门店加 SKC、门店加 SPU 层级使用 countDistinct 去重。SKU 明细上的 SKC/SPU 指标不能直接求和，否则会重复计数。一个 SPU 的动销率与其下 SKC 动销率可以不同，例如两个 SKC 均有库存但仅一个动销时，SPU 动销率可为 100%，SKC 动销率为 50%，属于层级口径差异而非计算错误。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "内容约束多层级商品指标的聚合与去重方式，属于 BI 指标计算规则。",
+    "category_confidence": 0.99
+  },
+  {
+    "title": "当前动销率的分子必须与铺店分母集合一致",
+    "category": "BI",
+    "subcategory": "动销率口径",
+    "tags": [
+      "动销率",
+      "当前库存",
+      "近7天销量",
+      "分子分母",
+      "售罄商品"
+    ],
+    "summary": "若当前铺店分母以实时库存大于零定义，当前动销分子应明确是否同样限制实时库存大于零，否则动销率可能超过 100%。",
+    "content": "当前铺店 SKC/SPU 通常以目标层级汇总后的实时库存 real_num 大于 0 判定；当前动销则以近 7 天普通销售净量大于 0 判定。若动销分子不要求当前库存大于 0，售罄但近 7 天有销量的对象会计入分子但不计入分母，可能造成动销率超过 1，或出现动销数大于 0 而分母为 0、比率被置为 0 的组合。若业务定义为当前在库商品的近 7 天动销率，分子必须同时限制当前库存大于 0；若允许售罄商品计入动销，则应采用能够覆盖该分子的分母，并由产品明确规则。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 5,
+      "stability": 4,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "内容涉及动销率分子分母集合关系和指标有效性，属于 BI 口径治理。",
+    "category_confidence": 0.99
+  },
+  {
+    "title": "期间铺店口径须区分期末在库与曾经铺货",
+    "category": "BI",
+    "subcategory": "铺店指标口径",
+    "tags": [
+      "期间铺店",
+      "期末库存",
+      "历史库存",
+      "动销",
+      "产品确认"
+    ],
+    "summary": "以期末库存或期间销售判断期间铺店，不等同于统计期间任意时刻曾有库存，产品定义必须明确二者差异。",
+    "content": "期间铺店 SKC/SPU 可定义为期间期末库存近似值大于 0，或期间普通销售净量大于 0；期间动销则以期间普通销售净量大于 0 判定。在该定义下，期间入库后全部调出、期末库存为 0 且无普通销售的对象不会被计入期间铺店。因此“期间铺店”必须明确是表示期末仍在店或期间有售出，还是表示期间任意时刻曾有库存；后者需要基于库存时点或完整出入库事件另行实现，不能由期末库存近似值替代。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 5,
+      "stability": 4,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "这是期间库存和铺店覆盖率的业务定义问题，属于 BI 指标口径。",
+    "category_confidence": 0.98
+  },
+  {
+    "title": "赠品销量与动销判定必须明确统一范围",
+    "category": "BI",
+    "subcategory": "销量口径治理",
+    "tags": [
+      "赠品",
+      "积分赠品",
+      "储值卡赠品",
+      "总销量",
+      "动销"
+    ],
+    "summary": "总销量包含赠品而动销仅使用普通销售时会产生口径差异，积分赠品和储值卡赠品是否代表动销应由产品确认。",
+    "content": "期间总销量可以包含普通销售、积分赠品和储值卡赠品，但期间 SKC/SPU 动销若只以普通销售净量大于 0 判定，则仅发生赠品的对象会出现总销量大于 0、动销数为 0 的结果。报表应明确赠品是否代表商品动销；若代表动销，动销分子应采用包含相应赠品的统一销量口径；若不代表动销，应在指标说明中明确总销量与动销销量的范围不同。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 4,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 4,
+      "personal_relevance": 4
+    },
+    "total_score": 20,
+    "category_action": "existing",
+    "category_reason": "内容定义销售与赠品在业务指标中的统计范围，属于 BI 口径治理。",
+    "category_confidence": 0.97
+  },
+  {
+    "title": "固定期间报表的动态当前指标必须可复现",
+    "category": "Testing",
+    "subcategory": "报表可复现性",
+    "tags": [
+      "today",
+      "now",
+      "快照",
+      "参数化",
+      "历史复现",
+      "时间边界"
+    ],
+    "summary": "固定统计期间与基于执行时当前日期的指标混用时，必须参数化基准时间或保存快照，才能复现验收与历史结果。",
+    "content": "当期间开始和结束日期固定，而当前库存、近 7 天销售、在店天数等字段依赖 today() 或 now() 时，同一 SQL 隔日运行会得到不同的当前指标，无法直接复现历史验收结果。应将当前基准日期或时间参数化并在执行记录中保存，或在统计时保留对应快照。近 7 天计算还应统一 Date 与 DateTime 语义，明确采用含今天的自然日窗口还是滚动 168 小时窗口，避免 addDays(today(), -7) 与 now() - INTERVAL 7 DAY 混用造成边界歧义。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "内容是历史报表验收、回归测试和时间窗口可复现性的测试规范。",
+    "category_confidence": 0.98
+  },
+  {
+    "title": "库存期末公式必须验证出库数量的符号语义",
+    "category": "SQL",
+    "subcategory": "库存计算校验",
+    "tags": [
+      "库存",
+      "期初库存",
+      "入库",
+      "出库",
+      "符号",
+      "期末库存"
+    ],
+    "summary": "库存平衡公式能否直接相加取决于出库字段的正负号约定，必须通过源数据和期末库存核验确认。",
+    "content": "期间期末库存近似值常按期初库存加期间入库加期间出库计算，即 sumPre_num + sumIn_num + sumOut_num。该公式仅在 out_num 已以负数表达出库时成立；若源表将出库数量存为正数，应使用期初库存加入库减出库。上线前应使用已知期初、入库、出库和源系统期末库存的样本验证库存平衡式，不能仅依字段名称假设符号含义。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "内容约束 SQL 库存流水字段的计算和验证方式，属于 SQL 数据处理规范。",
+    "category_confidence": 0.99
+  },
+  {
+    "title": "维表关联前必须保证业务键唯一避免放大",
+    "category": "SQL",
+    "subcategory": "关联基数控制",
+    "tags": [
+      "JOIN",
+      "维表",
+      "业务键",
+      "重复数据",
+      "窗口函数",
+      "聚合"
+    ],
+    "summary": "商品、门店和首次到店等维表关联前必须验证业务键唯一性，否则会重复放大销售和库存聚合结果。",
+    "content": "销售和库存事实表关联商品、门店、首次到店、淘汰门店等维表前，应验证关联业务键的唯一性。对于门店加 SKU 等目标中间粒度，进入窗口函数或最终聚合前每个业务键最多保留一行。若维表存在重复有效记录，JOIN 会复制事实行，导致销量、库存、窗口汇总和动销指标被放大。应通过唯一性检查、显式去重或按业务规则选取唯一有效版本控制关联基数。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 5,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 24,
+    "category_action": "existing",
+    "category_reason": "内容是 SQL 多表关联和聚合准确性的通用数据质量规则。",
+    "category_confidence": 0.99
+  },
+  {
+    "title": "SKU明细与WITH TOTALS总计行不得混合求和",
+    "category": "SQL",
+    "subcategory": "聚合结果使用规范",
+    "tags": [
+      "WITH TOTALS",
+      "LIMIT",
+      "SKU明细",
+      "总计行",
+      "去重聚合",
+      "报表"
+    ],
+    "summary": "按 SKU 展示的明细结果不能用于累加 SKC/SPU 总指标，应使用 WITH TOTALS 总计行或独立去重聚合。",
+    "content": "当 SQL 最外层按 SKU 输出时，同一 SKC 或 SPU 会在多条明细行中重复出现，明细行内的 SKC/SPU 计数不可直接累加。总指标应读取 WITH TOTALS 返回的总计行，或运行独立的目标层级 countDistinct 聚合。若结果使用 LIMIT，页面中的有限明细行更不能作为总计来源；总计行应与不带 LIMIT 的独立汇总结果核对一致。",
+    "source_date": "2026-09-22",
+    "source_ids": [
+      "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+    ],
+    "score": {
+      "reusability": 5,
+      "importance": 4,
+      "uniqueness": 4,
+      "stability": 5,
+      "personal_relevance": 5
+    },
+    "total_score": 23,
+    "category_action": "existing",
+    "category_reason": "内容规定 ClickHouse 明细聚合结果与总计行的正确使用方式，属于 SQL 聚合规范。",
+    "category_confidence": 0.98
+  }
+]

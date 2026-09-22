@@ -305,4 +305,4 @@ discard   → 不写长期记忆，只记录 memory_actions
 请参阅 [dianjia-py README](dianjia-py/README.md)，其中包含 CLI、Web 控制台、`.env`、RAG API、迁移命令和故障排查说明。 
 
 
-By 再也不会
+By 再也不会 2026-09-22

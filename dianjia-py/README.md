@@ -163,7 +163,7 @@ ${AI_BASE_URL}/chat/completions
 
 该功能默认关闭。要显式启用，在本地 `.env` 中添加：
 
-```env
+```
 DIANJIA_MEMORY_JUDGE=typesafe
 TYPESAFE_API_KEY=your_typesafe_api_key
 TYPESAFE_MODEL=jev-latest

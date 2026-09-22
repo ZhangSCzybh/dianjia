@@ -1,0 +1,30 @@
+{
+  "title": "库存期末公式必须验证出库数量的符号语义",
+  "category": "SQL",
+  "subcategory": "库存计算校验",
+  "tags": [
+    "库存",
+    "期初库存",
+    "入库",
+    "出库",
+    "符号",
+    "期末库存"
+  ],
+  "summary": "库存平衡公式能否直接相加取决于出库字段的正负号约定，必须通过源数据和期末库存核验确认。",
+  "content": "期间期末库存近似值常按期初库存加期间入库加期间出库计算，即 sumPre_num + sumIn_num + sumOut_num。该公式仅在 out_num 已以负数表达出库时成立；若源表将出库数量存为正数，应使用期初库存加入库减出库。上线前应使用已知期初、入库、出库和源系统期末库存的样本验证库存平衡式，不能仅依字段名称假设符号含义。",
+  "source_date": "2026-09-22",
+  "source_ids": [
+    "c80f7ea4-2b90-4155-a2b2-b6f3eed67d5f"
+  ],
+  "score": {
+    "reusability": 5,
+    "importance": 5,
+    "uniqueness": 4,
+    "stability": 5,
+    "personal_relevance": 5
+  },
+  "total_score": 24,
+  "category_action": "existing",
+  "category_reason": "内容约束 SQL 库存流水字段的计算和验证方式，属于 SQL 数据处理规范。",
+  "category_confidence": 0.99
+}

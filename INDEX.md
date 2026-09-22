@@ -139,6 +139,9 @@ Automatically generated from active Markdown memories.
 - [指标字典结构与字段治理](03_Memory/BI/指标字典结构与字段治理-66bde99f.md)
 - [数据同步问题：删除、合并、重建后数仓数据未更新](03_Memory/BI/数据同步问题-删除-合并-重建后数仓数据未更新-e105a419.md)
 - [数据权限](03_Memory/BI/数据权限-cf2e79e6.md)
+- [普通销售净量的订单类型和退货处理规则](03_Memory/BI/普通销售净量的订单类型和退货处理规则-b1fe9cde.md)
+- [期间铺店口径须区分期末在库与曾经铺货](03_Memory/BI/期间铺店口径须区分期末在库与曾经铺货-ab1c03a4.md)
+- [生命周期周销量的首到店日与边界规则](03_Memory/BI/生命周期周销量的首到店日与边界规则-acafd4f2.md)
 - [费用分摊与净利润指标](03_Memory/BI/指标计算/费用分摊与净利润.md)
 - [进销存报表口径差异与性能来源](03_Memory/BI/进销存报表口径差异与性能来源-a5d5d3cd.md)
 - [进销存期初期末与在途指标](03_Memory/BI/进销存期初期末与在途指标-dad498c2.md)
@@ -169,12 +172,15 @@ Automatically generated from active Markdown memories.
 ## SQL
 
 - [ClickHouse 查询技能与只读查询规范](03_Memory/SQL/clickhouse-查询技能与只读查询规范-72cc7a2e.md)
+- [SKU明细与WITH TOTALS总计行不得混合求和](03_Memory/SQL/sku明细与with-totals总计行不得混合求和-2c31a976.md)
 - [会员销售归类异常：品牌 15056](03_Memory/SQL/SQL问题排查/问题1/会员销售归类异常-品牌15056.md)
 - [期初库存与 biz_type](03_Memory/SQL/字段血缘/期初库存与biz_type.md)
+- [维表关联前必须保证业务键唯一避免放大](03_Memory/SQL/维表关联前必须保证业务键唯一避免放大-ac05edb8.md)
 
 ## Testing
 
 - [储值卡不得用于储值卡充值以阻断余额循环](03_Memory/Testing/储值卡不得用于储值卡充值以阻断余额循环-3eb354a5.md)
+- [固定期间报表的动态当前指标必须可复现](03_Memory/Testing/固定期间报表的动态当前指标必须可复现-0689d0c4.md)
 - [店家数仓销售报表测试](03_Memory/Testing/测试方法/店家数仓销售报表测试.md)
 
 ## Workflow
