@@ -70,7 +70,7 @@ class MvpTest(unittest.TestCase):
             report = service.pipeline_report()
             self.assertEqual(report["daily"], "unknown")
             self.assertEqual(report["extract"], "unknown")
-            self.assertEqual(report["judge"], {"ai": 0, "local": 0})
+            self.assertEqual(report["judge"], {"typesafe": 0, "ai": 0, "local": 0})
             service.conn.close()
 
     def test_web_run_daily_job_returns_pipeline_report(self):
@@ -111,6 +111,7 @@ class MvpTest(unittest.TestCase):
 
         self.assertIn("renderDecisions", page)
         self.assertIn("decision.reason", page)
+        self.assertIn("Jev Judge", page)
 
     def test_ai_prompt_is_bounded(self):
         bounded = MemoryService._truncate_for_ai("x" * 200000)

@@ -97,7 +97,7 @@ python main.py run-daily --date 2026-08-28
 
 `run-daily` 对 Source 按增量处理：首次运行会处理当天的新 Source；同一天再次运行时，未变化且已经完成处理（或已进入待复核）的 Source 会自动跳过，因此不会重复创建记忆、追加版本或写入处理动作。只有新导入的 Source、Source 文件内容发生变化的记录，或没有 `source_ids` 的手工候选，才会再次进入判断流程。日报和候选 JSON 仍可以每次重新生成，这是为了反映当天最新的 Inbox 内容。处理状态保存在 SQLite 的 `sources.processed_at`、`pipeline_status` 和 `last_candidate_hash` 字段中。
 
-命令行会在终端（标准错误输出）显示实际模式，例如 `[daily] 使用 AI 总结`、`[extract] 使用本地兜底`、`[judge] AI 决策 2 条，本地规则 1 条`。因此不要只看最终的 `create/update` 结果；以这些阶段标记判断是否真正请求了 AI。`ask` 也会显示 `[ask] 使用 AI 回答` 或 `[ask] AI 失败，返回本地检索上下文`。
+命令行会在终端（标准错误输出）显示实际模式，例如 `[daily] 使用 AI 总结`、`[extract] 使用本地兜底`、`[judge] Jev 决策 1 条，AI 决策 1 条，本地规则 0 条`。因此不要只看最终的 `create/update` 结果；以这些阶段标记判断实际使用的是 Jev、通用 AI 还是本地规则。`ask` 也会显示 `[ask] 使用 AI 回答` 或 `[ask] AI 失败，返回本地检索上下文`。
 
 如果希望强制重新处理某个候选，可使用分步命令 `python main.py memory process <候选文件>`；该命令默认不启用 Source 增量跳过，会按候选文件执行一次处理。修改 Source 后重新运行 `run-daily`，程序会通过内容哈希检测变化并重新处理。
 
@@ -157,7 +157,30 @@ ${AI_BASE_URL}/chat/completions
 
 为避免网关因请求过大主动断开连接，日报总结和候选提取发送给 AI 的单次上下文会限制在约 12 万字符；完整原始记录仍会保存在 `01_Daily`，不会被截断。若服务商返回 `RemoteDisconnected`、超时或其他连接错误，程序会自动切换本地兜底规则，`run-daily` 不会因此中断。
 
-也可以通过同名环境变量临时覆盖 `.env`。AI 用于日报总结、候选提取、记忆判断和 RAG 回答；调用失败时，日报、提取和判断会改用本地兜底规则，问答则返回检索上下文与错误说明。候选提取的本地兜底会按每条原始 Source 合并为一条候选，清理 `<details>` 等对话包装，并依据内容自动归入 `SQL`、`BI`、`Testing`、`AI` 或 `Projects`；只有无法识别主题时才使用 `General`。
+### TypeSafe Jev 记忆判定
+
+[Jev](https://docs.typesafe.ai/introduction) 是结构化判断模型，不生成日报、候选正文或 RAG 答案。Dianjia 只会把它用于 `memory process` / `run-daily` 的候选记忆判定：从 `create`、`update`、`merge`、`candidate`、`discard`、`conflict` 中选择动作，并从本地检索到的最多 5 条记忆中选择目标。
+
+该功能默认关闭。要显式启用，在本地 `.env` 中添加：
+
+```env
+DIANJIA_MEMORY_JUDGE=typesafe
+TYPESAFE_API_KEY=your_typesafe_api_key
+TYPESAFE_MODEL=jev-latest
+# TYPESAFE_BASE_URL=https://api.typesafe.ai/v1
+```
+
+`TYPESAFE_API_KEY` 只从环境变量或已被 Git 忽略的 `.env` 读取，不能提交到仓库。启用后，每条候选的判定顺序为：
+
+1. TypeSafe Jev 结构化判断。
+2. Jev 未配置、超时、限流重试耗尽或响应无效时，降级到现有 `AI_PROVIDER` 通道。
+3. 现有 AI 也不可用时，继续使用本地规则。
+
+Jev 只返回判断和概率，不负责改写记忆。低于现有长期记忆阈值 12 的 `create`、缺失有效目标的 `update`、以及没有额外合并对象的 `merge` 都会转为 `candidate` 待复核。审计记录会保存实际 Jev 模型版本、动作概率和置信度，但不会保存 API Key。
+
+项目已在 `.agents/skills/typesafe-ai` 安装 TypeSafe 官方 Skill。让编码 Agent 设计或修改 Jev 集成时，可明确要求“使用 `$typesafe-ai` Skill”；Skill 负责读取最新 TypeSafe 文档，应用运行时仍由本项目的标准库客户端调用 API。
+
+也可以通过同名环境变量临时覆盖 `.env`。通用 AI 用于日报总结、候选提取、记忆判断和 RAG 回答；启用 Jev 时仅替换记忆判断的第一选择。调用失败时，日报、提取和判断会按各自降级链路继续，问答则返回检索上下文与错误说明。候选提取的本地兜底会按每条原始 Source 合并为一条候选，清理 `<details>` 等对话包装，并依据内容自动归入 `SQL`、`BI`、`Testing`、`AI` 或 `Projects`；只有无法识别主题时才使用 `General`。
 
 ### API 排错
 
@@ -175,7 +198,7 @@ ${AI_BASE_URL}/chat/completions
 4. 需要更新时保留版本快照；不确定或互相矛盾时保留候选或冲突，不能把推测写成历史事实。
 5. 修改长期记忆 Markdown 后执行 `python main.py rebuild-index`。
 
-程序执行 `update` 时会将旧版本保存到 `06_Archive/versions/<memory-id>/`。执行 `merge` 时，被合并的来源记忆会在 SQLite 中标记为 `archived` 并建立关系记录，原 Markdown 仍作为可追溯的历史文件保留。
+程序执行 `update` 时会将旧版本保存到 `06_Archive/versions/<memory-id>/`。执行 `merge` 时，被合并的来源记忆会在 SQLite 和 Markdown frontmatter 中标记为 `archived` 并建立关系记录，原 Markdown 及归档前版本仍作为可追溯的历史文件保留。
 
 ## 路径与边界
 

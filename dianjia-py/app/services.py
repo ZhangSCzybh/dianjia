@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 import sys
 import unicodedata
@@ -15,6 +16,7 @@ from .config import Settings
 from .database import connect
 from .markdown import dump_frontmatter, parse_frontmatter, slugify
 from .ai.client import AIClient
+from .memory_judge import JevMemoryJudge
 from .models import MemoryDecision, ProcessOutcome, Source
 
 
@@ -27,9 +29,10 @@ class MemoryService:
         self.s.knowledge_root.mkdir(parents=True, exist_ok=True)
         self.conn = connect(self.s.db_path)
         self._last_judge_mode = "local"
+        self._last_judge_metadata: dict[str, Any] = {}
         self._last_daily_mode = "unknown"
         self._last_extract_mode = "unknown"
-        self._last_judge_counts = {"ai": 0, "local": 0}
+        self._last_judge_counts = {"typesafe": 0, "ai": 0, "local": 0}
 
     def init(self) -> None:
         for directory in ("00_Inbox", "01_Daily", "02_Candidate", "03_Memory", "04_Weekly", "05_Monthly", "06_Archive"):
@@ -534,8 +537,7 @@ class MemoryService:
             candidate_file = self.s.knowledge_root / "02_Candidate" / candidate_file
         candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
         outcomes: list[ProcessOutcome] = []
-        judge_ai_count = 0
-        judge_local_count = 0
+        judge_counts = {"typesafe": 0, "ai": 0, "local": 0}
         skipped_count = 0
 
         # Take a snapshot before processing.  A source can produce more than
@@ -552,10 +554,7 @@ class MemoryService:
                 skipped_count += 1
                 continue
             decision = self._judge_candidate(candidate)
-            if self._last_judge_mode == "ai":
-                judge_ai_count += 1
-            else:
-                judge_local_count += 1
+            judge_counts[self._last_judge_mode] += 1
             action = decision.action
             # A decision target is only meaningful after a successful write.
             # Candidate/conflict/discard results must not expose or audit an
@@ -576,7 +575,7 @@ class MemoryService:
                 self._save_special_candidate(candidate, "pending")
             elif action == "conflict":
                 self._save_special_candidate(candidate, "conflicts")
-            audit_payload = {"candidate": candidate, "decision": {"action": action, "target_memory_id": memory_id, "confidence": decision.confidence, "total_score": decision.total_score, "changes": decision.changes, "merge_memory_ids": decision.merge_memory_ids}}
+            audit_payload = {"candidate": candidate, "decision": {"action": action, "target_memory_id": memory_id, "confidence": decision.confidence, "total_score": decision.total_score, "changes": decision.changes, "merge_memory_ids": decision.merge_memory_ids}, "judge": dict(self._last_judge_metadata)}
             self.conn.execute("INSERT INTO memory_actions(memory_id, action, reason, payload, created_at) VALUES (?, ?, ?, ?, ?)", (memory_id, action, reason, json.dumps(audit_payload, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")))
             if memory_id and candidate_source_ids:
                 for source_id in candidate_source_ids:
@@ -593,8 +592,8 @@ class MemoryService:
             self.conn.commit()
             outcomes.append(ProcessOutcome(action, candidate["title"], reason, self._last_judge_mode, memory_id))
         if candidates:
-            print(f"[judge] AI 决策 {judge_ai_count} 条，本地规则 {judge_local_count} 条", file=sys.stderr)
-        self._last_judge_counts = {"ai": judge_ai_count, "local": judge_local_count}
+            print(f"[judge] Jev 决策 {judge_counts['typesafe']} 条，AI 决策 {judge_counts['ai']} 条，本地规则 {judge_counts['local']} 条", file=sys.stderr)
+        self._last_judge_counts = judge_counts
         if skipped_count:
             print(f"[process] 跳过 {skipped_count} 条未变化候选（Source 已处理）", file=sys.stderr)
         self.rebuild_index()
@@ -637,6 +636,15 @@ class MemoryService:
 
     def _judge_candidate(self, candidate: dict[str, Any]) -> MemoryDecision:
         existing = self.retrieve_context(candidate["title"], limit=5)
+        self._last_judge_metadata = {}
+        if os.getenv("DIANJIA_MEMORY_JUDGE", "llm").strip().lower() == "typesafe":
+            try:
+                result = JevMemoryJudge().decide(candidate, existing)
+                self._last_judge_mode = "typesafe"
+                self._last_judge_metadata = result.metadata
+                return result.decision
+            except (RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+                print(f"[judge] Jev 失败，降级 AI Judge：{exc}", file=sys.stderr)
         ai = AIClient()
         if ai.enabled:
             try:
@@ -712,8 +720,39 @@ class MemoryService:
         self._upsert_meta(meta, row["path"], candidate["source_date"])
         for merged_id in decision.merge_memory_ids:
             if merged_id != memory_id:
-                self.conn.execute("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", (candidate["source_date"], merged_id))
-                self.conn.execute("INSERT OR IGNORE INTO memory_relations(source_memory_id,target_memory_id,relation_type,created_at) VALUES(?,?,?,?)", (memory_id, merged_id, "merged_from", datetime.now().isoformat(timespec="seconds")))
+                self._archive_merged_memory(memory_id, merged_id, candidate["source_date"])
+
+    def _archive_merged_memory(self, primary_id: str, merged_id: str, updated_at: str) -> None:
+        row = self.conn.execute("SELECT * FROM memories WHERE id = ?", (merged_id,)).fetchone()
+        if not row:
+            return
+        path = self.s.knowledge_root / row["path"]
+        if path.exists():
+            self._archive_version(merged_id, path)
+            meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+            if not meta.get("id"):
+                try:
+                    tags = json.loads(row["tags"] or "[]")
+                except json.JSONDecodeError:
+                    tags = []
+                meta = {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "category": row["category"],
+                    "subcategory": row["subcategory"] or "",
+                    "tags": tags,
+                    "summary": row["summary"] or "",
+                    "score": row["score"] or 0,
+                    "memory_level": row["memory_level"] or "long_term",
+                    "created_at": row["created_at"] or updated_at,
+                }
+            meta["status"] = "archived"
+            meta["updated_at"] = updated_at
+            path.write_text(dump_frontmatter(meta, body), encoding="utf-8")
+            self._upsert_meta(meta, row["path"], updated_at)
+        else:
+            self.conn.execute("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", (updated_at, merged_id))
+        self.conn.execute("INSERT OR IGNORE INTO memory_relations(source_memory_id,target_memory_id,relation_type,created_at) VALUES(?,?,?,?)", (primary_id, merged_id, "merged_from", datetime.now().isoformat(timespec="seconds")))
 
     def _archive_version(self, memory_id: str, path: Path) -> Path:
         archive_dir = self.s.knowledge_root / "06_Archive" / "versions" / memory_id

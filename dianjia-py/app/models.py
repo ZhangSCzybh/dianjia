@@ -77,5 +77,5 @@ class ProcessOutcome:
         return {"action": self.action, "title": self.title, "reason": self.reason, "mode": self.mode, "memory_id": self.memory_id}
 
     def cli_text(self) -> str:
-        judge = "AI Judge" if self.mode == "ai" else "本地规则"
+        judge = {"typesafe": "Jev Judge", "ai": "AI Judge", "local": "本地规则"}.get(self.mode, self.mode)
         return f"{self.summary}\n  {judge} 理由：{self.reason or '未提供理由'}"
